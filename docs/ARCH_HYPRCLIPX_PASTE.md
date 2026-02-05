@@ -1,4 +1,4 @@
-# Architecture: Smart Paste in HyprClipX
+# Architecture: Clipboard Paste in CLion Terminal
 
 ## Layer Stack
 
@@ -7,34 +7,63 @@
 │ Hyprland (Wayland Compositor)                                   │
 │   - wlroots (Wayland Library)                                   │
 │   - Renders all windows via DRM/KMS                             │
-│   - HyprClipX plugin: dispatchers, IPC, fork+exec              │
 └─────────────────────┬───────────────────────────────────────────┘
                       │ Wayland Protocol (wl_surface, xdg_shell)
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │ XWayland (X11 Compatibility Layer)                              │
 │   - Xorg server for X11 apps under Wayland                     │
-│   - JetBrains IDEs, Electron apps, etc.                        │
+│   - CLion requires X11 (no native Wayland support)             │
 └─────────────────────┬───────────────────────────────────────────┘
                       │ X11 Protocol
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Target Application                                              │
-│   - Terminal (kitty, foot, alacritty, ...)                      │
-│   - Browser (Firefox, Chromium, ...)                            │
-│   - IDE (CLion, VSCode, ...)                                    │
-│   - Any Wayland/XWayland client                                 │
+│ CLion (JetBrains IDE)                                           │
+│   - JVM (Java Virtual Machine)                                  │
+│   - AWT/Swing UI Toolkit                                        │
 └─────────────────────┬───────────────────────────────────────────┘
-                      │ PTY / Input Events
+                      │ JNI (Java Native Interface)
                       ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│ Shell / Application Input                                       │
-│   - Receives pasted text via simulated keystrokes               │
-│   - Or via clipboard protocol + paste shortcut                  │
+│ JediTerm (Terminal Emulator Library)                            │
+│   - VT100/xterm Escape Sequence Parser                          │
+│   - PTY Master Side                                             │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │ PTY (Pseudo-Terminal) - /dev/pts/X
+                      │ ioctl(), read(), write()
+                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ zsh (Shell)                                                     │
+│   - PTY Slave Side                                              │
+│   - stdin/stdout/stderr                                         │
+│   - Job Control, Line Editing (ZLE)                             │
+└─────────────────────┬───────────────────────────────────────────┘
+                      │ fork() + execve()
+                      │ Pipes: stdin/stdout/stderr
+                      ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Claude Code (Node.js CLI)                                       │
+│   - Node.js Runtime (libuv for I/O)                             │
+│   - HTTPS → api.anthropic.com                                   │
+│   - child_process for bash commands                             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Smart Paste Flow
+## Clipboard Paste Flow
+
+### Wayland Native Apps
+```
+wl-copy "text"  →  Wayland Clipboard  →  wtype -M ctrl -M shift -k v
+```
+Required package: `wtype`
+
+### XWayland Apps (CLion, JetBrains IDEs)
+```
+wl-copy "text"  →  XWayland Clipboard Bridge  →  xdotool key ctrl+shift+v
+```
+Required package: `xdotool`
+
+## Smart Paste Flow (HyprClipX)
 
 HyprClipX detects the target window type and uses the appropriate paste method:
 
@@ -88,18 +117,16 @@ Matches window class against: `firefox`, `chromium`, `google-chrome`, `brave`, `
 
 ## Dependencies
 
-| App Type | Clipboard Write | Paste Method |
-|----------|----------------|--------------|
-| Wayland Terminal | `wl-copy` | `wtype` (Ctrl+Shift+V) |
+| App Type | Clipboard Write | Paste Method (Keyboard Simulation) |
+|----------|----------------|-------------------------------------|
+| Wayland Native | `wl-copy` | `wtype` |
 | Kitty Terminal | kitty remote control | `kitty @ paste-to-window` |
-| Wayland Browser | `wl-copy` | `wtype` (Ctrl+V, with delay) |
-| XWayland (X11) | `wl-copy` | `xdotool` (Ctrl+Shift+V) |
-| Wayland Default | `wl-copy` | `wtype` (Ctrl+V) |
+| XWayland (X11) | `wl-copy` / `xclip` | `xdotool` |
 
 ## Installation
 
 ```bash
-# Wayland tools (required)
+# Wayland tools
 sudo pacman -S wl-clipboard wtype
 
 # X11/XWayland tools (for CLion, JetBrains IDEs, etc.)
@@ -110,7 +137,7 @@ sudo pacman -S xdotool xclip
 # listen_on unix:/tmp/kitty-{kitty_pid}
 ```
 
-## Why JetBrains IDEs Need XWayland
+## Why CLion Needs XWayland
 
 JetBrains IDEs are based on Java Swing/AWT, which has no native Wayland support. They run through XWayland - an X11 compatibility layer within Wayland.
 
