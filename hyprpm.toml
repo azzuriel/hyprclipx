@@ -8,5 +8,6 @@ version = "0.1.0"
 output = "build/hyprclipx.so"
 build = [
     "cmake -DCMAKE_BUILD_TYPE=Release -B build",
-    "cmake --build build"
+    "cmake --build build",
+    "mkdir -p $HOME/.local/bin && cp build/hyprclipx-ui $HOME/.local/bin/"
 ]
