@@ -1,15 +1,12 @@
 // HyprClipX - Layer-shell clipboard manager for Hyprland
-// Plugin entry point and Hyprland API integration
+// Plugin entry point - LIGHTWEIGHT (no GTK, no threads)
+// UI runs as separate process (hyprclipx-ui)
 
 #define WLR_USE_UNSTABLE
 #include <hyprland/src/plugins/PluginAPI.hpp>
 #include <hyprland/src/Compositor.hpp>
-#include <hyprland/src/managers/KeybindManager.hpp>
-#include <hyprland/src/managers/input/InputManager.hpp>
 
 #include "hyprclipx/Globals.hpp"
-#include "hyprclipx/ClipboardManager.hpp"
-#include "hyprclipx/ClipboardRenderer.hpp"
 #include "hyprclipx/IPCHandler.hpp"
 
 using namespace hyprclipx;
@@ -17,11 +14,10 @@ using namespace hyprclipx;
 inline HANDLE g_pHandle = nullptr;
 
 // ============================================================================
-// IPC Command Handlers
+// IPC Command Handler (hyprctl hyprclipx <cmd> [args])
 // ============================================================================
 
 static std::string cmdHyprclipx(eHyprCtlOutputFormat, std::string request) {
-    // Parse command: "subcommand args"
     std::string cmd = request;
     std::string args;
 
@@ -34,39 +30,32 @@ static std::string cmdHyprclipx(eHyprCtlOutputFormat, std::string request) {
     if (g_ipcHandler) {
         return g_ipcHandler->handleCommand(cmd, args);
     }
-    return "error: IPC handler not initialized";
+    return "error: not initialized";
 }
 
 // ============================================================================
-// Dispatchers
+// Dispatchers (matching ags-toggle-clipboard.template flow)
 // ============================================================================
 
 static SDispatchResult dispatchShow(std::string) {
-    if (g_clipboardRenderer) {
-        g_clipboardRenderer->show();
-    }
+    captureAndSendUI("show");
     return {.success = true};
 }
 
 static SDispatchResult dispatchHide(std::string) {
-    if (g_clipboardRenderer) {
-        g_clipboardRenderer->hide();
-    }
+    sendUICommand("hide");
     return {.success = true};
 }
 
+// Toggle: capture caret BEFORE toggle (matching AGS flow)
 static SDispatchResult dispatchToggle(std::string) {
-    if (g_clipboardRenderer) {
-        g_clipboardRenderer->toggle();
-    }
+    captureAndSendUI("toggle");
     return {.success = true};
 }
 
 // ============================================================================
 // Plugin Lifecycle
 // ============================================================================
-
-static SP<HOOK_CALLBACK_FN> g_pKeyCallback;
 
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
@@ -76,10 +65,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     g_pHandle = handle;
     g_handle = handle;
 
-    // Initialize global instances
     initGlobals();
 
-    // Register IPC commands
+    // Register IPC command
     HyprlandAPI::registerHyprCtlCommand(g_handle,
         SHyprCtlCommand{"hyprclipx", true, cmdHyprclipx});
 

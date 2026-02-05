@@ -1,6 +1,6 @@
 [repository]
 name = "hyprclipx"
-authors = ["Your Name"]
+authors = ["Jan Ohlmann (azzuriel) <jan.ohlmann@hotmail.com>", "Leon Marzoll <leon.marzoll@gmail.com>"]
 
 [hyprclipx]
 description = "Layer-shell clipboard manager for Hyprland with GTK4 UI"

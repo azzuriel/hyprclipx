@@ -1,4 +1,4 @@
-// Single Responsibility: Configuration file parsing
+// Configuration file parsing
 
 #include "hyprclipx/ConfigParser.hpp"
 #include <fstream>
@@ -36,14 +36,10 @@ std::string getDataDir() {
     }
 
     dataDir += "/hyprclipx";
-
-    // Create directory if it doesn't exist
     fs::create_directories(dataDir);
-
     return dataDir;
 }
 
-// Simple TOML-like parser (manual, no external dependency)
 static std::string trim(const std::string& str) {
     size_t start = str.find_first_not_of(" \t\r\n");
     size_t end = str.find_last_not_of(" \t\r\n");
@@ -66,19 +62,12 @@ static int parseInt(const std::string& value) {
     }
 }
 
-static bool parseBool(const std::string& value) {
-    std::string v = trim(value);
-    return v == "true" || v == "1";
-}
-
 Config loadConfig() {
     Config config;
-    config.configPath = getConfigPath();
-    config.dataDir = getDataDir();
+    std::string configPath = getConfigPath();
 
-    std::ifstream file(config.configPath);
+    std::ifstream file(configPath);
     if (!file.is_open()) {
-        // Return defaults if config doesn't exist
         return config;
     }
 
@@ -86,7 +75,6 @@ Config loadConfig() {
     while (std::getline(file, line)) {
         line = trim(line);
 
-        // Skip comments and empty lines
         if (line.empty() || line[0] == '#' || line[0] == '[') {
             continue;
         }
@@ -97,52 +85,40 @@ Config loadConfig() {
         std::string key = trim(line.substr(0, eq));
         std::string value = trim(line.substr(eq + 1));
 
-        // Parse known keys
         if (key == "window_width") config.windowWidth = parseInt(value);
         else if (key == "window_height") config.windowHeight = parseInt(value);
         else if (key == "offset_x") config.offsetX = parseInt(value);
         else if (key == "offset_y") config.offsetY = parseInt(value);
-        else if (key == "bg_color") config.bgColor = parseString(value);
-        else if (key == "fg_color") config.fgColor = parseString(value);
-        else if (key == "accent_color") config.accentColor = parseString(value);
-        else if (key == "border_color") config.borderColor = parseString(value);
-        else if (key == "border_width") config.borderWidth = parseInt(value);
-        else if (key == "border_radius") config.borderRadius = parseInt(value);
         else if (key == "max_items") config.maxItems = parseInt(value);
-        else if (key == "show_images") config.showImages = parseBool(value);
-        else if (key == "show_favorites") config.showFavorites = parseBool(value);
         else if (key == "hotkey") config.hotkey = parseString(value);
+        else if (key == "socket_path") config.socketPath = parseString(value);
     }
 
     return config;
 }
 
 bool saveConfig(const Config& config) {
-    std::ofstream file(config.configPath);
+    std::string configPath = getConfigPath();
+
+    // Ensure parent directory exists
+    fs::create_directories(fs::path(configPath).parent_path());
+
+    std::ofstream file(configPath);
     if (!file.is_open()) {
         return false;
     }
 
     file << "# HyprClipX Configuration\n\n";
-    file << "[general]\n";
-    file << "hotkey = \"" << config.hotkey << "\"\n";
-    file << "max_items = " << config.maxItems << "\n";
-    file << "show_images = " << (config.showImages ? "true" : "false") << "\n";
-    file << "show_favorites = " << (config.showFavorites ? "true" : "false") << "\n\n";
-
     file << "[window]\n";
     file << "window_width = " << config.windowWidth << "\n";
     file << "window_height = " << config.windowHeight << "\n";
     file << "offset_x = " << config.offsetX << "\n";
     file << "offset_y = " << config.offsetY << "\n\n";
 
-    file << "[appearance]\n";
-    file << "bg_color = \"" << config.bgColor << "\"\n";
-    file << "fg_color = \"" << config.fgColor << "\"\n";
-    file << "accent_color = \"" << config.accentColor << "\"\n";
-    file << "border_color = \"" << config.borderColor << "\"\n";
-    file << "border_width = " << config.borderWidth << "\n";
-    file << "border_radius = " << config.borderRadius << "\n";
+    file << "[general]\n";
+    file << "hotkey = \"" << config.hotkey << "\"\n";
+    file << "max_items = " << config.maxItems << "\n";
+    file << "socket_path = \"" << config.socketPath << "\"\n";
 
     return true;
 }
