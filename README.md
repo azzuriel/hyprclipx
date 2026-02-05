@@ -271,3 +271,7 @@ BSD 3-Clause License (same as Hyprland)
 - 1:1 port of the [AGS clipboard manager](https://github.com/Aylur/ags)
 - Built for [Hyprland](https://hyprland.org)
 - Smart paste architecture inspired by the original iconmanager templates
+
+## Contributors
+
+- [Leon Marzoll](https://github.com/LeonMarzollDev) — Key contributor to the original version of the clipboard manager that this project is based on
