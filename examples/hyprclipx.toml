@@ -1,0 +1,22 @@
+# HyprClipX Configuration
+# Place this file at: ~/.config/hypr/hyprclipx.toml
+
+[general]
+hotkey = "SUPER V"
+max_items = 50
+show_images = true
+show_favorites = true
+
+[window]
+window_width = 450
+window_height = 550
+offset_x = 0
+offset_y = 0
+
+[appearance]
+bg_color = "#1e1e2e"
+fg_color = "#cdd6f4"
+accent_color = "#89b4fa"
+border_color = "#45475a"
+border_width = 2
+border_radius = 12

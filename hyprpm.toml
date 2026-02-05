@@ -1,0 +1,12 @@
+[repository]
+name = "hyprclipx"
+authors = ["Your Name"]
+
+[hyprclipx]
+description = "Layer-shell clipboard manager for Hyprland with GTK4 UI"
+version = "0.1.0"
+output = "build/hyprclipx.so"
+build = [
+    "cmake -DCMAKE_BUILD_TYPE=Release -B build",
+    "cmake --build build"
+]
