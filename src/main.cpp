@@ -17,19 +17,12 @@ using namespace hyprclipx;
 inline HANDLE g_pHandle = nullptr;
 
 // ============================================================================
-// IPC Command Handler
+// IPC Command Handlers
 // ============================================================================
 
-static SHyprCtlCommand::eHyprCtlOutputFormat g_outputFormat;
-
-static std::string onHyprCtlCommand(std::string request) {
-    // Parse command: "hyprclipx:command args"
-    size_t colonPos = request.find(':');
-    if (colonPos == std::string::npos) {
-        return "invalid command format";
-    }
-
-    std::string cmd = request.substr(colonPos + 1);
+static std::string cmdHyprclipx(eHyprCtlOutputFormat, std::string request) {
+    // Parse command: "subcommand args"
+    std::string cmd = request;
     std::string args;
 
     size_t spacePos = cmd.find(' ');
@@ -52,37 +45,28 @@ static SDispatchResult dispatchShow(std::string) {
     if (g_clipboardRenderer) {
         g_clipboardRenderer->show();
     }
-    return {};
+    return {.success = true};
 }
 
 static SDispatchResult dispatchHide(std::string) {
     if (g_clipboardRenderer) {
         g_clipboardRenderer->hide();
     }
-    return {};
+    return {.success = true};
 }
 
 static SDispatchResult dispatchToggle(std::string) {
     if (g_clipboardRenderer) {
         g_clipboardRenderer->toggle();
     }
-    return {};
-}
-
-// ============================================================================
-// Keybind Handler
-// ============================================================================
-
-static void onKeyPress(void*, SCallbackInfo& info, std::any data) {
-    // Check if our hotkey is pressed
-    // TODO: Implement proper hotkey handling based on config
-    (void)info;
-    (void)data;
+    return {.success = true};
 }
 
 // ============================================================================
 // Plugin Lifecycle
 // ============================================================================
+
+static SP<HOOK_CALLBACK_FN> g_pKeyCallback;
 
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
@@ -96,14 +80,8 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     initGlobals();
 
     // Register IPC commands
-    HyprlandAPI::registerHyprCtlCommand(
-        handle,
-        SHyprCtlCommand {
-            .command = "hyprclipx",
-            .exact = false,
-            .fn = onHyprCtlCommand
-        }
-    );
+    HyprlandAPI::registerHyprCtlCommand(g_handle,
+        SHyprCtlCommand{"hyprclipx", true, cmdHyprclipx});
 
     // Register dispatchers
     HyprlandAPI::addDispatcherV2(handle, "hyprclipx:show", dispatchShow);
@@ -116,13 +94,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(handle, "plugin:hyprclipx:hotkey",
                                 Hyprlang::STRING{"SUPER V"});
 
-    // Register key callback (for hotkey handling)
-    static auto keyCallback = HyprlandAPI::registerCallbackDynamic(
-        handle, "keyPress", onKeyPress);
-
     HyprlandAPI::addNotification(handle,
         "[HyprClipX] Loaded successfully!",
-        CColor{0.2f, 0.8f, 0.2f, 1.0f},
+        CHyprColor(0.2f, 0.8f, 0.2f, 1.0f),
         5000);
 
     return {
@@ -138,6 +112,6 @@ APICALL EXPORT void PLUGIN_EXIT() {
 
     HyprlandAPI::addNotification(g_pHandle,
         "[HyprClipX] Unloaded",
-        CColor{0.8f, 0.8f, 0.2f, 1.0f},
+        CHyprColor(0.8f, 0.8f, 0.2f, 1.0f),
         3000);
 }

@@ -2,6 +2,8 @@
 
 #include "hyprclipx/IPCHandler.hpp"
 #include "hyprclipx/Globals.hpp"
+#include "hyprclipx/ClipboardManager.hpp"
+#include "hyprclipx/ClipboardRenderer.hpp"
 
 namespace hyprclipx {
 
