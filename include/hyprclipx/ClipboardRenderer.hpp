@@ -1,13 +1,12 @@
 #pragma once
-// 1:1 port of ags-clipboard-manager.template
-// GTK4 Layer-Shell window - runs as standalone Wayland client process (NOT in compositor!)
+// HyprClipX UI — compact horizontal clipboard manager
+// GTK4 Layer-Shell window — standalone Wayland client (NOT in compositor!)
 
 #include "Forward.hpp"
 #include "Config.hpp"
 #include "ClipboardEntry.hpp"
 #include <gtk/gtk.h>
 #include <gtk4-layer-shell.h>
-#include <functional>
 #include <string>
 #include <vector>
 #include <atomic>
@@ -19,14 +18,11 @@ public:
     explicit ClipboardRenderer(Config& config, ClipboardManager& manager);
     ~ClipboardRenderer();
 
-    void initialize();  // Create window + UI (call AFTER gtk_init)
+    void initialize();
     void show();
     void hide();
     void toggle();
     bool isVisible() const;
-
-    int getOffsetX() const { return m_config.offsetX; }
-    int getOffsetY() const { return m_config.offsetY; }
     void setOffset(int x, int y);
     void refresh();
 
@@ -35,53 +31,47 @@ private:
     ClipboardManager& m_manager;
 
     // GTK widgets
-    GtkWidget* m_window = nullptr;
-    GtkWidget* m_listBox = nullptr;
-    GtkWidget* m_searchEntry = nullptr;
-    GtkWidget* m_offsetLabel = nullptr;
-    GtkWidget* m_scrolled = nullptr;
-    GtkWidget* m_tabButtons[4] = {};
+    GtkWidget* m_window       = nullptr;
+    GtkWidget* m_listBox      = nullptr;
+    GtkWidget* m_searchEntry  = nullptr;
+    GtkWidget* m_scrolled     = nullptr;
+    GtkWidget* m_offsetLabel  = nullptr;
+    GtkWidget* m_countLabel   = nullptr;
+    GtkWidget* m_filterButtons[4] = {};
 
-    // State (matching AGS createState variables)
+    // State
     std::string m_filter = "all";
     std::string m_search;
     std::vector<ClipboardEntry> m_items;
     int m_selectedIndex = 0;
-    int m_filterIndex = 0;
+    int m_filterIndex   = 0;
     std::atomic<bool> m_visible{false};
-
-    // Previous window for focus restore (matching AGS)
     std::string m_previousWindowAddress;
 
-    // UI building (matching AGS widget tree exactly)
+    // UI assembly
     void buildUI();
-    GtkWidget* createHeader();
-    GtkWidget* createTabs();
-    GtkWidget* createSearchBox();
-    GtkWidget* createFooter();
-    GtkWidget* createOffsetControls();
+    GtkWidget* createSidebar();
+    GtkWidget* createSearchBar();
+    GtkWidget* createHintBar();
 
-    // List management (matching AGS updateList/updateSelection)
+    // List management
     void updateList();
     void updateSelection(int newIndex);
-    void updateTabs();
+    void updateFilterIcons();
     void scrollToIndex(int index);
+    void updateOffsetOverlay();
 
-    // Smart paste (1:1 from AGS pasteItem)
+    // Smart paste (1:1 from AGS)
     void pasteItem(const std::string& uuid, const std::string& itemType);
 
-    // Window helpers (matching AGS)
+    // Window helpers
     void repositionWindow();
     void loadCaretOffset();
     void saveCaretOffset();
 
-    // Terminal/browser detection (1:1 from AGS)
+    // Window detection (1:1 from AGS)
     struct WindowInfo {
-        std::string windowClass;
-        std::string initialClass;
-        std::string title;
-        std::string initialTitle;
-        std::string address;
+        std::string windowClass, initialClass, title, initialTitle, address;
         int pid = 0;
         bool xwayland = false;
     };
@@ -90,17 +80,16 @@ private:
     bool isKittyTerminal(const WindowInfo& win);
     bool isBrowser(const WindowInfo& win);
 
-    // Keyboard handler (matching AGS keyController)
-    static gboolean onKeyPress(GtkEventControllerKey* controller,
-                               guint keyval, guint keycode,
-                               GdkModifierType state, gpointer data);
+    // Keyboard handler
+    static gboolean onKeyPress(GtkEventControllerKey*, guint, guint,
+                               GdkModifierType, gpointer);
 
     // Helpers
     void removeAllChildren(GtkWidget* box);
     std::string exec(const std::string& cmd);
 
-    static constexpr int ITEM_HEIGHT = 54;
-    static constexpr int OFFSET_STEP = 20;
+    static constexpr int ITEM_HEIGHT  = 28;
+    static constexpr int OFFSET_STEP  = 20;
 };
 
 } // namespace hyprclipx

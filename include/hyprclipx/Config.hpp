@@ -4,9 +4,9 @@
 namespace hyprclipx {
 
 struct Config {
-    // Window dimensions (matching AGS: 450x550)
-    int windowWidth = 450;
-    int windowHeight = 550;
+    // Window dimensions (compact horizontal layout)
+    int windowWidth = 600;
+    int windowHeight = 220;
 
     // Caret offset (persisted in user-settings.json)
     int offsetX = 0;

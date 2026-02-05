@@ -1,6 +1,5 @@
-// 1:1 port of ags-clipboard-manager.template
-// GTK4 Layer-Shell window - standalone Wayland client (NOT in compositor!)
-// No threads needed: gtk_init() is safe because we're a separate process.
+// HyprClipX UI — compact horizontal clipboard manager
+// GTK4 Layer-Shell window — standalone Wayland client (NOT in compositor!)
 
 #include "hyprclipx/ClipboardRenderer.hpp"
 #include "hyprclipx/ClipboardManager.hpp"
@@ -16,7 +15,7 @@
 
 namespace hyprclipx {
 
-// Terminal identifiers (1:1 from AGS TERMINAL_IDENTIFIERS)
+// ── Terminal identifiers (1:1 from AGS) ─────────────────────────────────────
 static const std::vector<std::string> TERMINAL_IDENTIFIERS = {
     "kitty", "alacritty", "foot", "wezterm", "konsole",
     "gnome-terminal", "xterm", "urxvt", "terminator", "tilix",
@@ -28,267 +27,202 @@ static const std::vector<std::string> TERMINAL_IDENTIFIERS = {
     "jetbrains-studio"
 };
 
-// Filter names (1:1 from AGS filterNames)
+// ── Filter definitions (SSOT) ───────────────────────────────────────────────
 static const std::string FILTER_NAMES[] = {"all", "favorites", "text", "image"};
-static const std::string FILTER_LABELS[] = {"All", "\xe2\x98\x86", "Text", "Images"};
+static const char* FILTER_ICONS[] = {"\xe2\x8a\x9b", "\xe2\x98\x86", "\xf0\x9d\x90\x93", "\xf0\x9f\x96\xbc"};
 
-// CSS (1:1 from AGS style.scss - HyprZones muted dark theme)
+// ── Browser identifiers (SSOT) ─────────────────────────────────────────────
+static const std::vector<std::string> BROWSER_IDENTIFIERS = {
+    "firefox", "chrome", "chromium", "brave", "vivaldi",
+    "opera", "zen", "floorp", "librewolf", "edge"
+};
+
+// ── CSS — compact horizontal layout, HyprZones dark theme ───────────────────
 static const char* CLIPBOARD_CSS = R"CSS(
-.ClipboardManager {
-  background: transparent;
-}
+.ClipboardManager { background: transparent; }
 
-.cm-container {
+.cm-root {
   background: #0a0a0a;
   border: 1px solid #2a2a2a;
+}
+
+/* ── Sidebar ── */
+.cm-sidebar {
+  background: #0e0e0e;
+  border-right: 1px solid #1a1a1a;
+  padding: 4px 2px;
+  min-width: 36px;
+}
+
+.cm-sidebar-icon {
+  min-width: 32px;
+  min-height: 28px;
+  padding: 2px;
   border-radius: 0;
-  padding: 12px;
-  min-width: 420px;
-  min-height: 500px;
-}
-
-.cm-header {
-  padding-bottom: 8px;
-  border-bottom: 1px solid #2a2a2a;
-}
-
-.cm-header .cm-icon {
-  font-size: 20px;
-  color: #3a6a3a;
-}
-
-.cm-header .cm-title {
-  font-size: 14px;
-  font-weight: 600;
-  font-family: "Fira Code", monospace;
-  color: #8a9a9a;
-}
-
-.cm-tabs {
-  background: #121212;
-  border: 1px solid #1f1f1f;
-  padding: 4px;
-  border-radius: 0;
-}
-
-.cm-tabs .cm-tab {
-  padding: 6px 14px;
-  border-radius: 0;
-  border: 1px solid #2a2a2a;
-  color: #6a7a7a;
-  background: #1a1a1a;
-  font-size: 12px;
-  font-family: "Fira Code", monospace;
-}
-
-.cm-tabs .cm-tab:hover {
-  background: #242424;
-  border-color: #3a5a3a;
-  color: #8a9a9a;
-}
-
-.cm-tabs .cm-tab.active {
-  background: #2a5a2a;
-  border-color: #3a6a3a;
-  color: #8a9a9a;
-}
-
-.cm-search {
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  padding: 6px 10px;
-  border-radius: 0;
-}
-
-.cm-search label {
+  border: 1px solid transparent;
+  background: transparent;
   color: #4a5a5a;
+  font-size: 13px;
+}
+.cm-sidebar-icon:hover {
+  background: #1a1a1a;
+  border-color: #2a3a2a;
+  color: #7a9a7a;
+}
+.cm-sidebar-icon.active {
+  background: #1a2a1a;
+  border-color: #3a6a3a;
+  color: #8aba8a;
 }
 
-.cm-search .cm-search-input {
+.cm-sidebar-sep {
+  background: #1a1a1a;
+  min-height: 1px;
+  margin: 3px 4px;
+}
+
+.cm-count {
+  font-size: 9px;
+  font-family: "Fira Code", monospace;
+  color: #3a4a4a;
+  padding: 2px;
+}
+
+/* ── Search ── */
+.cm-search {
+  background: #111111;
+  border-bottom: 1px solid #1a1a1a;
+  padding: 4px 8px;
+}
+.cm-search label {
+  color: #3a4a3a;
+  font-size: 12px;
+}
+.cm-search-input {
   background: transparent;
   border: none;
   color: #8a9a9a;
   font-family: "Fira Code", monospace;
-  font-size: 12px;
+  font-size: 11px;
   caret-color: #3a6a3a;
 }
+.cm-search-input:focus { outline: none; }
 
-.cm-search .cm-search-input:focus {
-  outline: none;
-}
-
-.cm-scroll {
-  min-height: 350px;
-}
-
-.cm-list {
-  padding: 4px;
-  padding-bottom: 20px;
-}
-
-.cm-item-row {
-  margin-bottom: 4px;
-}
+/* ── Item list ── */
+.cm-scroll { min-height: 120px; }
+.cm-list { padding: 2px 4px; }
 
 .cm-item {
-  background: #1a1a1a;
-  padding: 10px 12px;
+  padding: 3px 8px;
   border-radius: 0;
-  border: 1px solid #2a2a2a;
+  border: 1px solid transparent;
+  background: transparent;
 }
-
 .cm-item:hover {
-  background: #242424;
-  border-color: #3a5a3a;
+  background: #161616;
+  border-color: #1a2a1a;
 }
-
 .cm-item.selected {
-  background: rgba(42, 90, 42, 0.3);
-  border: 1px solid #3a6a3a;
+  background: rgba(42, 90, 42, 0.25);
+  border-color: #3a6a3a;
 }
-
 .cm-item.selected:hover {
-  background: rgba(58, 106, 58, 0.3);
+  background: rgba(58, 106, 58, 0.25);
 }
 
-.cm-item .cm-preview {
+.cm-preview {
   font-family: "Fira Code", monospace;
-  font-size: 12px;
-  color: #8a9a9a;
-}
-
-.cm-item .cm-thumb {
-  min-width: 80px;
-  min-height: 50px;
-  border: 1px solid #2a2a2a;
-}
-
-.cm-fav-btn {
-  background: #1a1a1a;
-  color: #4a5a5a;
-  padding: 10px 16px;
-  border-radius: 0;
-  border: 1px solid #2a2a2a;
-  min-width: 44px;
-}
-
-.cm-fav-btn:hover {
-  background: #242424;
-  border-color: #3a5a3a;
-  color: #f9e2af;
-}
-
-.cm-fav-btn.active {
-  color: #f9e2af;
-  border-color: rgba(249, 226, 175, 0.3);
-}
-
-.cm-fav-btn.active:hover {
-  background: rgba(249, 226, 175, 0.15);
-}
-
-.cm-footer {
-  padding-top: 8px;
-  border-top: 1px solid #2a2a2a;
-}
-
-.cm-footer .cm-clear-btn {
-  background: rgba(138, 74, 74, 0.2);
-  color: #cc9999;
-  padding: 8px 16px;
-  border-radius: 0;
-  border: 1px solid rgba(138, 74, 74, 0.5);
-  font-size: 12px;
-  font-family: "Fira Code", monospace;
-}
-
-.cm-footer .cm-clear-btn:hover {
-  background: rgba(138, 74, 74, 0.4);
-  border-color: rgba(138, 74, 74, 0.7);
-  color: #ffaaaa;
-}
-
-.cm-footer .cm-offset-btn {
-  background: #1a1a1a;
-  color: #6a7a7a;
-  padding: 8px 16px;
-  border-radius: 0;
-  border: 1px solid #2a2a2a;
-  font-size: 12px;
-  font-family: "Fira Code", monospace;
-}
-
-.cm-footer .cm-offset-btn:hover {
-  background: #242424;
-  border-color: #3a5a3a;
-  color: #8a9a9a;
-}
-
-.cm-offset-label {
   font-size: 11px;
-  font-family: "Fira Code", monospace;
-  color: #6a7a7a;
+  color: #7a8a8a;
+}
+.cm-item.selected .cm-preview {
+  color: #9aaa9a;
 }
 
-.cm-offset-controls {
-  padding: 0 4px;
+.cm-fav-indicator {
+  font-size: 10px;
+  color: #2a3a3a;
+  min-width: 14px;
+}
+.cm-fav-indicator.starred {
+  color: #f9e2af;
+}
+
+.cm-img-indicator {
+  font-size: 9px;
+  color: #3a5a5a;
+  margin-right: 4px;
+}
+
+/* ── Hint bar ── */
+.cm-hints {
+  background: #0a0a0a;
+  border-top: 1px solid #1a1a1a;
+  padding: 2px 8px;
+}
+.cm-hint {
+  font-size: 9px;
+  font-family: "Fira Code", monospace;
+  color: #2a3a3a;
+}
+
+/* ── Offset overlay ── */
+.cm-offset-overlay {
+  background: rgba(42, 90, 42, 0.85);
+  color: #8a9a9a;
+  font-size: 9px;
+  font-family: "Fira Code", monospace;
+  padding: 1px 6px;
+  border: 1px solid #3a6a3a;
+  margin: 4px;
 }
 )CSS";
 
+// ── Ctor / Dtor ─────────────────────────────────────────────────────────────
+
 ClipboardRenderer::ClipboardRenderer(Config& config, ClipboardManager& manager)
-    : m_config(config)
-    , m_manager(manager) {
-}
+    : m_config(config), m_manager(manager) {}
 
 ClipboardRenderer::~ClipboardRenderer() {
-    if (m_window) {
-        gtk_window_destroy(GTK_WINDOW(m_window));
-        m_window = nullptr;
-    }
+    if (m_window) { gtk_window_destroy(GTK_WINDOW(m_window)); m_window = nullptr; }
 }
 
-// ============================================================================
-// Helper: exec command and return stdout (matching AGS execAsync)
-// ============================================================================
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 std::string ClipboardRenderer::exec(const std::string& cmd) {
-    std::array<char, 4096> buffer;
+    std::array<char, 4096> buf;
     std::string result;
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) return "";
-    while (fgets(buffer.data(), buffer.size(), pipe)) {
-        result += buffer.data();
-    }
+    while (fgets(buf.data(), buf.size(), pipe)) result += buf.data();
     pclose(pipe);
-    while (!result.empty() && (result.back() == '\n' || result.back() == '\r')) {
+    while (!result.empty() && (result.back() == '\n' || result.back() == '\r'))
         result.pop_back();
-    }
     return result;
 }
 
-// ============================================================================
-// Initialization (call AFTER gtk_init)
-// ============================================================================
+static std::string toLower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), ::tolower);
+    return s;
+}
+
+// ── Initialize ──────────────────────────────────────────────────────────────
 
 void ClipboardRenderer::initialize() {
     loadCaretOffset();
 
-    // Load CSS (matching AGS style.scss - HyprZones theme)
-    GtkCssProvider* cssProvider = gtk_css_provider_new();
-    gtk_css_provider_load_from_string(cssProvider, CLIPBOARD_CSS);
+    GtkCssProvider* css = gtk_css_provider_new();
+    gtk_css_provider_load_from_string(css, CLIPBOARD_CSS);
     gtk_style_context_add_provider_for_display(
-        gdk_display_get_default(),
-        GTK_STYLE_PROVIDER(cssProvider),
+        gdk_display_get_default(), GTK_STYLE_PROVIDER(css),
         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
-    g_object_unref(cssProvider);
+    g_object_unref(css);
 
-    // Create layer-shell window (matching AGS Astal.Window config)
     m_window = gtk_window_new();
-    gtk_window_set_title(GTK_WINDOW(m_window), "Clipboard Manager");
+    gtk_window_set_title(GTK_WINDOW(m_window), "HyprClipX");
     gtk_window_set_default_size(GTK_WINDOW(m_window),
                                 m_config.windowWidth, m_config.windowHeight);
 
-    // Layer-shell (matching AGS: anchor TOP|LEFT, layer TOP, keymode ON_DEMAND)
     gtk_layer_init_for_window(GTK_WINDOW(m_window));
     gtk_layer_set_layer(GTK_WINDOW(m_window), GTK_LAYER_SHELL_LAYER_TOP);
     gtk_layer_set_keyboard_mode(GTK_WINDOW(m_window),
@@ -296,248 +230,221 @@ void ClipboardRenderer::initialize() {
     gtk_layer_set_anchor(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_TOP, TRUE);
     gtk_layer_set_anchor(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_LEFT, TRUE);
     gtk_layer_set_namespace(GTK_WINDOW(m_window), "clipboard-manager");
-
-    // CSS class (matching AGS: win.add_css_class("ClipboardManager"))
     gtk_widget_add_css_class(m_window, "ClipboardManager");
 
     buildUI();
 
-    // Close-request (matching AGS: win.connect("close-request"))
     g_signal_connect(m_window, "close-request",
-                     G_CALLBACK(+[](GtkWindow*, gpointer data) -> gboolean {
-                         auto* self = static_cast<ClipboardRenderer*>(data);
-                         gtk_widget_set_visible(self->m_window, FALSE);
-                         self->m_visible = false;
-                         return TRUE;
-                     }), this);
+        G_CALLBACK(+[](GtkWindow*, gpointer d) -> gboolean {
+            auto* s = static_cast<ClipboardRenderer*>(d);
+            gtk_widget_set_visible(s->m_window, FALSE);
+            s->m_visible = false;
+            return TRUE;
+        }), this);
 
-    // Map signal: reposition window (matching AGS: win.connect("map"))
     g_signal_connect(m_window, "map",
-                     G_CALLBACK(+[](GtkWidget*, gpointer data) {
-                         auto* self = static_cast<ClipboardRenderer*>(data);
-                         self->repositionWindow();
-                     }), this);
+        G_CALLBACK(+[](GtkWidget*, gpointer d) {
+            static_cast<ClipboardRenderer*>(d)->repositionWindow();
+        }), this);
 
-    // Show signal: reset state and refresh (matching AGS: win.connect("show"))
     g_signal_connect(m_window, "show",
-                     G_CALLBACK(+[](GtkWidget*, gpointer data) {
-                         auto* self = static_cast<ClipboardRenderer*>(data);
-
-                         // Read previous window address (matching AGS)
-                         std::ifstream f(self->m_config.prevWindowFile);
-                         if (f.is_open()) {
-                             std::getline(f, self->m_previousWindowAddress);
-                         }
-
-                         self->m_selectedIndex = 0;
-                         self->m_search.clear();
-                         if (self->m_searchEntry) {
-                             gtk_editable_set_text(GTK_EDITABLE(self->m_searchEntry), "");
-                         }
-                         if (self->m_scrolled) {
-                             GtkAdjustment* vadj = gtk_scrolled_window_get_vadjustment(
-                                 GTK_SCROLLED_WINDOW(self->m_scrolled));
-                             if (vadj) gtk_adjustment_set_value(vadj, 0);
-                         }
-                         self->updateList();
-                     }), this);
+        G_CALLBACK(+[](GtkWidget*, gpointer d) {
+            auto* s = static_cast<ClipboardRenderer*>(d);
+            std::ifstream f(s->m_config.prevWindowFile);
+            if (f.is_open()) std::getline(f, s->m_previousWindowAddress);
+            s->m_selectedIndex = 0;
+            s->m_search.clear();
+            if (s->m_searchEntry)
+                gtk_editable_set_text(GTK_EDITABLE(s->m_searchEntry), "");
+            if (s->m_scrolled) {
+                auto* vadj = gtk_scrolled_window_get_vadjustment(
+                    GTK_SCROLLED_WINDOW(s->m_scrolled));
+                if (vadj) gtk_adjustment_set_value(vadj, 0);
+            }
+            s->updateList();
+        }), this);
 }
 
-// ============================================================================
-// UI Building (matching AGS widget tree exactly)
-// ============================================================================
+// ── UI Assembly ─────────────────────────────────────────────────────────────
+//
+//  ╭────┬────────────────────────────────────────────────╮
+//  │ 📋 │ 🔍 …                                           │
+//  │ ⊛  ├────────────────────────────────────────────────┤
+//  │ ☆  │ ▸ item text preview...                      ★  │
+//  │ 𝐓  │   another entry...                          ☆  │
+//  │ 🖼  │   ...                                       ☆  │
+//  │    │                                                │
+//  │ 🗑  │                                                │
+//  │ 7  │                                                │
+//  ╰────┴────────────────────────────────────────────────╯
+//   ↑↓ ⏎ ⌫ ⇥ ⎋ ⌘⌥↕
 
 void ClipboardRenderer::buildUI() {
-    GtkWidget* mainBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    gtk_widget_add_css_class(mainBox, "cm-container");
+    // Root: horizontal (sidebar | content)
+    GtkWidget* root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_add_css_class(root, "cm-root");
 
-    gtk_box_append(GTK_BOX(mainBox), createHeader());
-    gtk_box_append(GTK_BOX(mainBox), createTabs());
-    gtk_box_append(GTK_BOX(mainBox), createSearchBox());
+    gtk_box_append(GTK_BOX(root), createSidebar());
 
-    // Scrollable item list (matching AGS ScrolledWindow)
+    // Content: vertical (search | items | hints)
+    GtkWidget* content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_hexpand(content, TRUE);
+
+    gtk_box_append(GTK_BOX(content), createSearchBar());
+
     m_scrolled = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(m_scrolled),
                                    GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
     gtk_widget_set_vexpand(m_scrolled, TRUE);
     gtk_widget_add_css_class(m_scrolled, "cm-scroll");
 
-    m_listBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    m_listBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
     gtk_widget_add_css_class(m_listBox, "cm-list");
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(m_scrolled), m_listBox);
-    gtk_box_append(GTK_BOX(mainBox), m_scrolled);
+    gtk_box_append(GTK_BOX(content), m_scrolled);
 
-    gtk_box_append(GTK_BOX(mainBox), createFooter());
-    gtk_window_set_child(GTK_WINDOW(m_window), mainBox);
+    gtk_box_append(GTK_BOX(content), createHintBar());
+    gtk_box_append(GTK_BOX(root), content);
 
-    // Keyboard handler (matching AGS EventControllerKey)
-    GtkEventController* keyController = gtk_event_controller_key_new();
-    g_signal_connect(keyController, "key-pressed",
-                     G_CALLBACK(onKeyPress), this);
-    gtk_widget_add_controller(m_window, keyController);
+    // Overlay for offset indicator
+    GtkWidget* overlay = gtk_overlay_new();
+    gtk_overlay_set_child(GTK_OVERLAY(overlay), root);
+
+    m_offsetLabel = gtk_label_new("");
+    gtk_widget_add_css_class(m_offsetLabel, "cm-offset-overlay");
+    gtk_widget_set_halign(m_offsetLabel, GTK_ALIGN_END);
+    gtk_widget_set_valign(m_offsetLabel, GTK_ALIGN_END);
+    gtk_widget_set_visible(m_offsetLabel, FALSE);
+    gtk_overlay_add_overlay(GTK_OVERLAY(overlay), m_offsetLabel);
+
+    gtk_window_set_child(GTK_WINDOW(m_window), overlay);
+
+    // Key handler
+    GtkEventController* kc = gtk_event_controller_key_new();
+    g_signal_connect(kc, "key-pressed", G_CALLBACK(onKeyPress), this);
+    gtk_widget_add_controller(m_window, kc);
 }
 
-GtkWidget* ClipboardRenderer::createHeader() {
-    GtkWidget* header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_widget_add_css_class(header, "cm-header");
+// ── Sidebar (icon column) ───────────────────────────────────────────────────
 
-    GtkWidget* icon = gtk_label_new("\xf0\x9f\x93\x8b");
-    gtk_widget_add_css_class(icon, "cm-icon");
+GtkWidget* ClipboardRenderer::createSidebar() {
+    GtkWidget* bar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+    gtk_widget_add_css_class(bar, "cm-sidebar");
 
-    GtkWidget* title = gtk_label_new("Clipboard Manager");
-    gtk_widget_add_css_class(title, "cm-title");
-    gtk_widget_set_hexpand(title, TRUE);
-    gtk_label_set_xalign(GTK_LABEL(title), 0);
+    // Clipboard icon (decorative)
+    GtkWidget* logo = gtk_label_new("\xf0\x9f\x93\x8b");
+    gtk_widget_add_css_class(logo, "cm-sidebar-icon");
+    gtk_box_append(GTK_BOX(bar), logo);
 
-    gtk_box_append(GTK_BOX(header), icon);
-    gtk_box_append(GTK_BOX(header), title);
-    return header;
-}
+    // Separator
+    GtkWidget* sep1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_widget_add_css_class(sep1, "cm-sidebar-sep");
+    gtk_box_append(GTK_BOX(bar), sep1);
 
-GtkWidget* ClipboardRenderer::createTabs() {
-    GtkWidget* tabs = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
-    gtk_widget_add_css_class(tabs, "cm-tabs");
-
-    struct TabData { ClipboardRenderer* self; int index; };
-
+    // Filter icons
+    struct FilterData { ClipboardRenderer* self; int idx; };
     for (int i = 0; i < 4; i++) {
-        GtkWidget* btn = gtk_button_new();
+        GtkWidget* btn = gtk_button_new_with_label(FILTER_ICONS[i]);
         gtk_widget_set_can_focus(btn, FALSE);
-        GtkWidget* label = gtk_label_new(FILTER_LABELS[i].c_str());
-        gtk_button_set_child(GTK_BUTTON(btn), label);
-        gtk_widget_add_css_class(btn, "cm-tab");
+        gtk_widget_add_css_class(btn, "cm-sidebar-icon");
         if (i == 0) gtk_widget_add_css_class(btn, "active");
 
-        auto* td = new TabData{this, i};
+        auto* fd = new FilterData{this, i};
         g_signal_connect(btn, "clicked",
-                         G_CALLBACK(+[](GtkButton*, gpointer data) {
-                             auto* td = static_cast<TabData*>(data);
-                             td->self->m_filterIndex = td->index;
-                             td->self->m_filter = FILTER_NAMES[td->index];
-                             td->self->m_selectedIndex = 0;
-                             td->self->updateTabs();
-                             td->self->updateList();
-                         }), td);
+            G_CALLBACK(+[](GtkButton*, gpointer d) {
+                auto* fd = static_cast<FilterData*>(d);
+                fd->self->m_filterIndex = fd->idx;
+                fd->self->m_filter = FILTER_NAMES[fd->idx];
+                fd->self->m_selectedIndex = 0;
+                fd->self->updateFilterIcons();
+                fd->self->updateList();
+            }), fd);
 
-        m_tabButtons[i] = btn;
-        gtk_box_append(GTK_BOX(tabs), btn);
+        m_filterButtons[i] = btn;
+        gtk_box_append(GTK_BOX(bar), btn);
     }
-    return tabs;
+
+    // Spacer
+    GtkWidget* spacer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_vexpand(spacer, TRUE);
+    gtk_box_append(GTK_BOX(bar), spacer);
+
+    // Separator
+    GtkWidget* sep2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_widget_add_css_class(sep2, "cm-sidebar-sep");
+    gtk_box_append(GTK_BOX(bar), sep2);
+
+    // Clear button
+    GtkWidget* clearBtn = gtk_button_new_with_label("\xf0\x9f\x97\x91");
+    gtk_widget_set_can_focus(clearBtn, FALSE);
+    gtk_widget_add_css_class(clearBtn, "cm-sidebar-icon");
+    g_signal_connect(clearBtn, "clicked",
+        G_CALLBACK(+[](GtkButton*, gpointer d) {
+            auto* s = static_cast<ClipboardRenderer*>(d);
+            s->m_manager.clearAll();
+            s->updateList();
+        }), this);
+    gtk_box_append(GTK_BOX(bar), clearBtn);
+
+    // Item count
+    m_countLabel = gtk_label_new("0");
+    gtk_widget_add_css_class(m_countLabel, "cm-count");
+    gtk_box_append(GTK_BOX(bar), m_countLabel);
+
+    return bar;
 }
 
-GtkWidget* ClipboardRenderer::createSearchBox() {
-    GtkWidget* searchBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_widget_add_css_class(searchBox, "cm-search");
+// ── Search bar ──────────────────────────────────────────────────────────────
 
-    GtkWidget* searchIcon = gtk_label_new("\xf0\x9f\x94\x8d");
+GtkWidget* ClipboardRenderer::createSearchBar() {
+    GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_widget_add_css_class(box, "cm-search");
+
+    GtkWidget* icon = gtk_label_new("\xf0\x9f\x94\x8d");
+    gtk_box_append(GTK_BOX(box), icon);
 
     m_searchEntry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(m_searchEntry), "Type to search...");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(m_searchEntry), "\xe2\x80\xa6");
     gtk_widget_set_hexpand(m_searchEntry, TRUE);
     gtk_widget_set_can_focus(m_searchEntry, FALSE);
     gtk_widget_add_css_class(m_searchEntry, "cm-search-input");
 
     g_signal_connect(m_searchEntry, "changed",
-                     G_CALLBACK(+[](GtkEditable*, gpointer data) {
-                         auto* self = static_cast<ClipboardRenderer*>(data);
-                         const char* text = gtk_editable_get_text(GTK_EDITABLE(self->m_searchEntry));
-                         self->m_search = text ? text : "";
-                         self->m_selectedIndex = 0;
-                         self->updateList();
-                     }), this);
+        G_CALLBACK(+[](GtkEditable*, gpointer d) {
+            auto* s = static_cast<ClipboardRenderer*>(d);
+            const char* t = gtk_editable_get_text(GTK_EDITABLE(s->m_searchEntry));
+            s->m_search = t ? t : "";
+            s->m_selectedIndex = 0;
+            s->updateList();
+        }), this);
 
-    gtk_box_append(GTK_BOX(searchBox), searchIcon);
-    gtk_box_append(GTK_BOX(searchBox), m_searchEntry);
-    return searchBox;
-}
-
-GtkWidget* ClipboardRenderer::createFooter() {
-    GtkWidget* footer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_widget_add_css_class(footer, "cm-footer");
-
-    GtkWidget* clearBtn = gtk_button_new();
-    gtk_widget_set_can_focus(clearBtn, FALSE);
-    gtk_widget_add_css_class(clearBtn, "cm-clear-btn");
-    GtkWidget* clearBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
-    GtkWidget* trashIcon = gtk_label_new("\xf0\x9f\x97\x91");
-    GtkWidget* clearLabel = gtk_label_new("Clear All");
-    gtk_box_append(GTK_BOX(clearBox), trashIcon);
-    gtk_box_append(GTK_BOX(clearBox), clearLabel);
-    gtk_button_set_child(GTK_BUTTON(clearBtn), clearBox);
-    g_signal_connect(clearBtn, "clicked",
-                     G_CALLBACK(+[](GtkButton*, gpointer data) {
-                         auto* self = static_cast<ClipboardRenderer*>(data);
-                         self->m_manager.clearAll();
-                         self->updateList();
-                     }), this);
-
-    gtk_box_append(GTK_BOX(footer), clearBtn);
-    gtk_box_append(GTK_BOX(footer), createOffsetControls());
-    return footer;
-}
-
-GtkWidget* ClipboardRenderer::createOffsetControls() {
-    GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
-    gtk_widget_set_hexpand(box, TRUE);
-    gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
-    gtk_widget_add_css_class(box, "cm-offset-controls");
-
-    m_offsetLabel = gtk_label_new("");
-    gtk_widget_add_css_class(m_offsetLabel, "cm-offset-label");
-    {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%d,%d", m_config.offsetX, m_config.offsetY);
-        gtk_label_set_text(GTK_LABEL(m_offsetLabel), buf);
-    }
-
-    auto makeBtn = [&](const char* label, int dx, int dy) -> GtkWidget* {
-        GtkWidget* btn = gtk_button_new_with_label(label);
-        gtk_widget_set_can_focus(btn, FALSE);
-        gtk_widget_add_css_class(btn, "cm-offset-btn");
-
-        struct OffsetData { ClipboardRenderer* self; int dx; int dy; };
-        auto* od = new OffsetData{this, dx, dy};
-        g_signal_connect(btn, "clicked",
-                         G_CALLBACK(+[](GtkButton*, gpointer data) {
-                             auto* od = static_cast<OffsetData*>(data);
-                             od->self->m_config.offsetX += od->dx;
-                             od->self->m_config.offsetY += od->dy;
-                             od->self->saveCaretOffset();
-                             char buf[32];
-                             snprintf(buf, sizeof(buf), "%d,%d",
-                                      od->self->m_config.offsetX,
-                                      od->self->m_config.offsetY);
-                             gtk_label_set_text(GTK_LABEL(od->self->m_offsetLabel), buf);
-                             od->self->repositionWindow();
-                         }), od);
-        return btn;
-    };
-
-    GtkWidget* resetBtn = gtk_button_new_with_label("\xe2\x9f\xb2");
-    gtk_widget_set_can_focus(resetBtn, FALSE);
-    gtk_widget_add_css_class(resetBtn, "cm-offset-btn");
-    g_signal_connect(resetBtn, "clicked",
-                     G_CALLBACK(+[](GtkButton*, gpointer data) {
-                         auto* self = static_cast<ClipboardRenderer*>(data);
-                         self->m_config.offsetX = 0;
-                         self->m_config.offsetY = 0;
-                         self->saveCaretOffset();
-                         gtk_label_set_text(GTK_LABEL(self->m_offsetLabel), "0,0");
-                         self->repositionWindow();
-                     }), this);
-
-    gtk_box_append(GTK_BOX(box), makeBtn("\xe2\x97\x80", -OFFSET_STEP, 0));
-    gtk_box_append(GTK_BOX(box), makeBtn("\xe2\x96\xb2", 0, -OFFSET_STEP));
-    gtk_box_append(GTK_BOX(box), m_offsetLabel);
-    gtk_box_append(GTK_BOX(box), makeBtn("\xe2\x96\xbc", 0, OFFSET_STEP));
-    gtk_box_append(GTK_BOX(box), makeBtn("\xe2\x96\xb6", OFFSET_STEP, 0));
-    gtk_box_append(GTK_BOX(box), resetBtn);
+    gtk_box_append(GTK_BOX(box), m_searchEntry);
     return box;
 }
 
-// ============================================================================
-// List Management (matching AGS updateList / updateSelection)
-// ============================================================================
+// ── Hint bar (keyboard shortcuts) ───────────────────────────────────────────
+
+GtkWidget* ClipboardRenderer::createHintBar() {
+    GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_add_css_class(box, "cm-hints");
+
+    const char* hints =
+        "\xe2\x86\x91\xe2\x86\x93 nav  \xc2\xb7  "   // ↑↓ nav  ·
+        "\xe2\x8f\x8e paste  \xc2\xb7  "               // ⏎ paste  ·
+        "\xe2\x8c\xab del  \xc2\xb7  "                 // ⌫ del  ·
+        "\xe2\x87\xa5 filter  \xc2\xb7  "              // ⇥ filter  ·
+        "\xe2\x8e\x8b close  \xc2\xb7  "               // ⎋ close  ·
+        "\xe2\x8c\x98\xe2\x8c\xa5\xe2\x86\x95 move";  // ⌘⌥↕ move
+
+    GtkWidget* label = gtk_label_new(hints);
+    gtk_widget_add_css_class(label, "cm-hint");
+    gtk_widget_set_hexpand(label, TRUE);
+    gtk_label_set_xalign(GTK_LABEL(label), 0);
+    gtk_box_append(GTK_BOX(box), label);
+    return box;
+}
+
+// ── List management ─────────────────────────────────────────────────────────
 
 void ClipboardRenderer::removeAllChildren(GtkWidget* box) {
     GtkWidget* child = gtk_widget_get_first_child(box);
@@ -550,105 +457,78 @@ void ClipboardRenderer::removeAllChildren(GtkWidget* box) {
 
 void ClipboardRenderer::updateList() {
     m_items = m_manager.fetchItems(m_filter, m_search, m_config.maxItems);
-
     if (!m_listBox) return;
     removeAllChildren(m_listBox);
 
     for (size_t i = 0; i < m_items.size(); i++) {
         const auto& item = m_items[i];
 
-        GtkWidget* itemRow = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-        gtk_widget_add_css_class(itemRow, "cm-item-row");
+        GtkWidget* row = gtk_button_new();
+        gtk_widget_set_can_focus(row, FALSE);
+        gtk_widget_add_css_class(row, "cm-item");
+        gtk_widget_add_css_class(row, item.type.c_str());
+        if (static_cast<int>(i) == m_selectedIndex)
+            gtk_widget_add_css_class(row, "selected");
 
-        GtkWidget* contentBtn = gtk_button_new();
-        gtk_widget_set_hexpand(contentBtn, TRUE);
-        gtk_widget_set_can_focus(contentBtn, FALSE);
-        gtk_widget_add_css_class(contentBtn, "cm-item");
-        gtk_widget_add_css_class(contentBtn, item.type.c_str());
-        if (static_cast<int>(i) == m_selectedIndex) {
-            gtk_widget_add_css_class(contentBtn, "selected");
+        GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+
+        // Image indicator
+        if (item.type == "image") {
+            GtkWidget* imgIcon = gtk_label_new("\xe2\x96\xa0");
+            gtk_widget_add_css_class(imgIcon, "cm-img-indicator");
+            gtk_box_append(GTK_BOX(hbox), imgIcon);
         }
 
-        GtkWidget* innerBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+        // Preview text
+        GtkWidget* preview = gtk_label_new(
+            item.preview.empty() ? (item.type == "image" ? item.thumb.c_str() : "[Empty]")
+                                 : item.preview.c_str());
+        gtk_widget_set_hexpand(preview, TRUE);
+        gtk_label_set_xalign(GTK_LABEL(preview), 0);
+        gtk_label_set_max_width_chars(GTK_LABEL(preview), 60);
+        gtk_label_set_ellipsize(GTK_LABEL(preview), PANGO_ELLIPSIZE_END);
+        gtk_widget_add_css_class(preview, "cm-preview");
+        gtk_box_append(GTK_BOX(hbox), preview);
 
-        if (item.type == "image" && !item.thumb.empty()) {
-            // Image thumbnail (matching AGS thumbImage)
-            GtkWidget* thumbImage = gtk_image_new_from_file(item.thumb.c_str());
-            gtk_image_set_pixel_size(GTK_IMAGE(thumbImage), 48);
-            gtk_widget_add_css_class(thumbImage, "cm-thumb");
-            gtk_box_append(GTK_BOX(innerBox), thumbImage);
+        // Fav star (inline indicator, not a button)
+        GtkWidget* star = gtk_label_new(
+            item.favorite ? "\xe2\x98\x85" : "\xe2\x98\x86");
+        gtk_widget_add_css_class(star, "cm-fav-indicator");
+        if (item.favorite) gtk_widget_add_css_class(star, "starred");
+        gtk_box_append(GTK_BOX(hbox), star);
 
-            // Image info label (matching AGS: no max_width_chars, fallback "[Image]")
-            GtkWidget* infoLabel = gtk_label_new(
-                item.preview.empty() ? "[Image]" : item.preview.c_str());
-            gtk_widget_set_hexpand(infoLabel, TRUE);
-            gtk_label_set_xalign(GTK_LABEL(infoLabel), 0);
-            gtk_widget_add_css_class(infoLabel, "cm-preview");
-            gtk_box_append(GTK_BOX(innerBox), infoLabel);
-        } else {
-            // Text preview (matching AGS: max_width_chars 45, ellipsize END)
-            GtkWidget* preview = gtk_label_new(
-                item.preview.empty() ? "[Empty]" : item.preview.c_str());
-            gtk_widget_set_hexpand(preview, TRUE);
-            gtk_label_set_xalign(GTK_LABEL(preview), 0);
-            gtk_label_set_max_width_chars(GTK_LABEL(preview), 45);
-            gtk_label_set_ellipsize(GTK_LABEL(preview), PANGO_ELLIPSIZE_END);
-            gtk_widget_add_css_class(preview, "cm-preview");
-            gtk_box_append(GTK_BOX(innerBox), preview);
-        }
+        gtk_button_set_child(GTK_BUTTON(row), hbox);
 
-        gtk_button_set_child(GTK_BUTTON(contentBtn), innerBox);
-
+        // Click → paste
         struct ClickData { ClipboardRenderer* self; std::string uuid; std::string type; };
         auto* cd = new ClickData{this, item.uuid, item.type};
-        g_signal_connect(contentBtn, "clicked",
-                         G_CALLBACK(+[](GtkButton*, gpointer data) {
-                             auto* cd = static_cast<ClickData*>(data);
-                             cd->self->pasteItem(cd->uuid, cd->type);
-                         }), cd);
+        g_signal_connect(row, "clicked",
+            G_CALLBACK(+[](GtkButton*, gpointer d) {
+                auto* cd = static_cast<ClickData*>(d);
+                cd->self->pasteItem(cd->uuid, cd->type);
+            }), cd);
 
-        GtkWidget* favBtn = gtk_button_new();
-        gtk_widget_set_valign(favBtn, GTK_ALIGN_FILL);
-        gtk_widget_set_can_focus(favBtn, FALSE);
-        gtk_widget_add_css_class(favBtn, "cm-fav-btn");
-        if (item.favorite) gtk_widget_add_css_class(favBtn, "active");
-        GtkWidget* starLabel = gtk_label_new(
-            item.favorite ? "\xe2\x98\x85" : "\xe2\x98\x86");
-        gtk_button_set_child(GTK_BUTTON(favBtn), starLabel);
+        gtk_box_append(GTK_BOX(m_listBox), row);
+    }
 
-        struct FavData { ClipboardRenderer* self; std::string uuid; };
-        auto* fd = new FavData{this, item.uuid};
-        g_signal_connect(favBtn, "clicked",
-                         G_CALLBACK(+[](GtkButton*, gpointer data) {
-                             auto* fd = static_cast<FavData*>(data);
-                             fd->self->m_manager.toggleFavorite(fd->uuid);
-                             fd->self->updateList();
-                         }), fd);
-
-        gtk_box_append(GTK_BOX(itemRow), contentBtn);
-        gtk_box_append(GTK_BOX(itemRow), favBtn);
-        gtk_box_append(GTK_BOX(m_listBox), itemRow);
+    // Update count
+    if (m_countLabel) {
+        gtk_label_set_text(GTK_LABEL(m_countLabel),
+                           std::to_string(m_items.size()).c_str());
     }
 }
 
 void ClipboardRenderer::updateSelection(int newIndex) {
-    if (newIndex == m_selectedIndex) return;
-    if (!m_listBox) return;
+    if (newIndex == m_selectedIndex || !m_listBox) return;
 
     int idx = 0;
     GtkWidget* child = gtk_widget_get_first_child(m_listBox);
     while (child) {
-        GtkWidget* contentBtn = gtk_widget_get_first_child(child);
-        if (idx == m_selectedIndex && contentBtn) {
-            gtk_widget_remove_css_class(contentBtn, "selected");
-        }
-        if (idx == newIndex && contentBtn) {
-            gtk_widget_add_css_class(contentBtn, "selected");
-        }
+        if (idx == m_selectedIndex) gtk_widget_remove_css_class(child, "selected");
+        if (idx == newIndex)        gtk_widget_add_css_class(child, "selected");
         child = gtk_widget_get_next_sibling(child);
         idx++;
     }
-
     m_selectedIndex = newIndex;
     scrollToIndex(newIndex);
 }
@@ -658,184 +538,185 @@ void ClipboardRenderer::scrollToIndex(int index) {
     GtkAdjustment* vadj = gtk_scrolled_window_get_vadjustment(
         GTK_SCROLLED_WINDOW(m_scrolled));
     if (!vadj) return;
-
-    double scrollHeight = gtk_adjustment_get_page_size(vadj);
-    double itemTop = index * ITEM_HEIGHT;
-    double itemBottom = itemTop + ITEM_HEIGHT;
-    double scrollY = gtk_adjustment_get_value(vadj);
-
-    if (itemBottom > scrollY + scrollHeight) {
-        gtk_adjustment_set_value(vadj, itemBottom - scrollHeight);
-    } else if (itemTop < scrollY) {
-        gtk_adjustment_set_value(vadj, itemTop);
-    }
+    double page = gtk_adjustment_get_page_size(vadj);
+    double top = index * ITEM_HEIGHT;
+    double bot = top + ITEM_HEIGHT;
+    double cur = gtk_adjustment_get_value(vadj);
+    if (bot > cur + page) gtk_adjustment_set_value(vadj, bot - page);
+    else if (top < cur)   gtk_adjustment_set_value(vadj, top);
 }
 
-void ClipboardRenderer::updateTabs() {
+void ClipboardRenderer::updateFilterIcons() {
     for (int i = 0; i < 4; i++) {
-        if (i == m_filterIndex) {
-            gtk_widget_add_css_class(m_tabButtons[i], "active");
-        } else {
-            gtk_widget_remove_css_class(m_tabButtons[i], "active");
-        }
+        if (i == m_filterIndex) gtk_widget_add_css_class(m_filterButtons[i], "active");
+        else                    gtk_widget_remove_css_class(m_filterButtons[i], "active");
     }
 }
 
-// ============================================================================
-// Keyboard Handler (1:1 from AGS keyController.connect("key-pressed"))
-// ============================================================================
+void ClipboardRenderer::updateOffsetOverlay() {
+    if (!m_offsetLabel) return;
+    if (m_config.offsetX == 0 && m_config.offsetY == 0) {
+        gtk_widget_set_visible(m_offsetLabel, FALSE);
+    } else {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%d,%d", m_config.offsetX, m_config.offsetY);
+        gtk_label_set_text(GTK_LABEL(m_offsetLabel), buf);
+        gtk_widget_set_visible(m_offsetLabel, TRUE);
+    }
+}
+
+// ── Keyboard handler ────────────────────────────────────────────────────────
 
 gboolean ClipboardRenderer::onKeyPress(GtkEventControllerKey*,
                                         guint keyval, guint,
-                                        GdkModifierType, gpointer data) {
+                                        GdkModifierType state, gpointer data) {
     auto* self = static_cast<ClipboardRenderer*>(data);
-    int itemCount = static_cast<int>(self->m_items.size());
+    int count = static_cast<int>(self->m_items.size());
+
+    // Super+Alt+Arrow: move window offset
+    if ((state & GDK_SUPER_MASK) && (state & GDK_ALT_MASK)) {
+        int dx = 0, dy = 0;
+        if      (keyval == GDK_KEY_Left)  dx = -OFFSET_STEP;
+        else if (keyval == GDK_KEY_Right) dx =  OFFSET_STEP;
+        else if (keyval == GDK_KEY_Up)    dy = -OFFSET_STEP;
+        else if (keyval == GDK_KEY_Down)  dy =  OFFSET_STEP;
+        else if (keyval == GDK_KEY_r || keyval == GDK_KEY_R) {
+            self->m_config.offsetX = 0;
+            self->m_config.offsetY = 0;
+            self->saveCaretOffset();
+            self->updateOffsetOverlay();
+            self->repositionWindow();
+            return TRUE;
+        }
+        if (dx || dy) {
+            self->m_config.offsetX += dx;
+            self->m_config.offsetY += dy;
+            self->saveCaretOffset();
+            self->updateOffsetOverlay();
+            self->repositionWindow();
+            return TRUE;
+        }
+    }
+
+    // Ctrl+F: toggle favorite
+    if ((state & GDK_CONTROL_MASK) && (keyval == GDK_KEY_f || keyval == GDK_KEY_F)) {
+        if (!self->m_items.empty() && self->m_selectedIndex < count) {
+            self->m_manager.toggleFavorite(self->m_items[self->m_selectedIndex].uuid);
+            self->updateList();
+        }
+        return TRUE;
+    }
 
     if (keyval == GDK_KEY_Escape) {
         gtk_widget_set_visible(self->m_window, FALSE);
         self->m_visible = false;
         return TRUE;
     }
-
     if (keyval == GDK_KEY_Down) {
-        int newIdx = std::min(self->m_selectedIndex + 1, itemCount - 1);
-        self->updateSelection(newIdx);
+        self->updateSelection(std::min(self->m_selectedIndex + 1, count - 1));
         return TRUE;
     }
-
     if (keyval == GDK_KEY_Up) {
-        int newIdx = std::max(self->m_selectedIndex - 1, 0);
-        self->updateSelection(newIdx);
+        self->updateSelection(std::max(self->m_selectedIndex - 1, 0));
         return TRUE;
     }
-
     if (keyval == GDK_KEY_Return || keyval == GDK_KEY_KP_Enter) {
-        if (!self->m_items.empty() && self->m_selectedIndex < itemCount) {
-            const auto& item = self->m_items[self->m_selectedIndex];
-            self->pasteItem(item.uuid, item.type);
+        if (!self->m_items.empty() && self->m_selectedIndex < count)
+            self->pasteItem(self->m_items[self->m_selectedIndex].uuid,
+                            self->m_items[self->m_selectedIndex].type);
+        return TRUE;
+    }
+    if (keyval == GDK_KEY_Delete) {
+        if (!self->m_items.empty() && self->m_selectedIndex < count) {
+            self->m_manager.deleteItem(self->m_items[self->m_selectedIndex].uuid);
+            self->updateList();
+            if (self->m_selectedIndex >= static_cast<int>(self->m_items.size()))
+                self->m_selectedIndex = std::max(0, static_cast<int>(self->m_items.size()) - 1);
         }
         return TRUE;
     }
-
     if (keyval == GDK_KEY_Home) {
         self->updateSelection(0);
         return TRUE;
     }
-
     if (keyval == GDK_KEY_End) {
-        self->updateSelection(std::max(0, itemCount - 1));
+        self->updateSelection(std::max(0, count - 1));
         return TRUE;
     }
-
     if (keyval == GDK_KEY_Tab) {
-        int newIdx = (self->m_filterIndex + 1) % 4;
-        self->m_filterIndex = newIdx;
-        self->m_filter = FILTER_NAMES[newIdx];
+        int n = (self->m_filterIndex + 1) % 4;
+        self->m_filterIndex = n;
+        self->m_filter = FILTER_NAMES[n];
         self->m_selectedIndex = 0;
-        self->updateTabs();
+        self->updateFilterIcons();
         self->updateList();
         return TRUE;
     }
-
     if (keyval == GDK_KEY_ISO_Left_Tab) {
-        int newIdx = (self->m_filterIndex - 1 + 4) % 4;
-        self->m_filterIndex = newIdx;
-        self->m_filter = FILTER_NAMES[newIdx];
+        int n = (self->m_filterIndex + 3) % 4;
+        self->m_filterIndex = n;
+        self->m_filter = FILTER_NAMES[n];
         self->m_selectedIndex = 0;
-        self->updateTabs();
+        self->updateFilterIcons();
         self->updateList();
         return TRUE;
     }
-
     if (keyval == GDK_KEY_BackSpace) {
-        const char* text = gtk_editable_get_text(GTK_EDITABLE(self->m_searchEntry));
-        std::string current = text ? text : "";
-        if (!current.empty()) {
-            current.pop_back();
-            gtk_editable_set_text(GTK_EDITABLE(self->m_searchEntry), current.c_str());
-        }
+        const char* t = gtk_editable_get_text(GTK_EDITABLE(self->m_searchEntry));
+        std::string cur = t ? t : "";
+        if (!cur.empty()) { cur.pop_back(); gtk_editable_set_text(GTK_EDITABLE(self->m_searchEntry), cur.c_str()); }
         return TRUE;
     }
-
     guint32 ch = gdk_keyval_to_unicode(keyval);
     if (ch > 31 && ch < 127) {
-        const char* text = gtk_editable_get_text(GTK_EDITABLE(self->m_searchEntry));
-        std::string current = text ? text : "";
-        current += static_cast<char>(ch);
-        gtk_editable_set_text(GTK_EDITABLE(self->m_searchEntry), current.c_str());
+        const char* t = gtk_editable_get_text(GTK_EDITABLE(self->m_searchEntry));
+        std::string cur = t ? t : "";
+        cur += static_cast<char>(ch);
+        gtk_editable_set_text(GTK_EDITABLE(self->m_searchEntry), cur.c_str());
         return TRUE;
     }
-
     return FALSE;
 }
 
-// ============================================================================
-// Smart Paste (1:1 from AGS pasteItem)
-// Runs blocking parts in a detached thread to avoid freezing GTK event loop.
-// ============================================================================
+// ── Smart paste (1:1 from AGS) ──────────────────────────────────────────────
 
 void ClipboardRenderer::pasteItem(const std::string& uuid, const std::string& itemType) {
-    // 1. Hide window FIRST (matching AGS) - GTK call on main thread
     gtk_widget_set_visible(m_window, FALSE);
     m_visible = false;
 
-    // 2. Run the rest in a detached thread (all non-GTK operations)
     std::string prevAddr = m_previousWindowAddress;
     ClipboardManager* mgr = &m_manager;
 
     std::thread([this, uuid, itemType, prevAddr, mgr]() {
-        // Restore focus to previous window (matching AGS)
-        if (!prevAddr.empty()) {
+        if (!prevAddr.empty())
             exec("hyprctl dispatch focuswindow address:" + prevAddr);
-        }
 
-        // Wait for focus (matching AGS: 150ms)
         std::this_thread::sleep_for(std::chrono::milliseconds(150));
-
-        // Get target window info (matching AGS)
-        WindowInfo targetWin = getActiveWindowInfo();
-
-        // Copy to clipboard via daemon (matching AGS)
+        WindowInfo win = getActiveWindowInfo();
         mgr->paste(uuid);
-
-        // Wait for clipboard (matching AGS: 200ms)
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-        // Smart paste (matching AGS paste logic exactly)
-        bool isXWayland = targetWin.xwayland;
+        bool xw = win.xwayland;
 
-        if (isKittyTerminal(targetWin) && itemType == "text") {
-            int ret = system("kitty @ send-text --from-clipboard 2>/dev/null");
-            if (ret == 0) return;
-            // Fallback to normal terminal paste (matching AGS catch block)
+        if (isKittyTerminal(win) && itemType == "text") {
+            if (system("kitty @ send-text --from-clipboard 2>/dev/null") == 0) return;
         }
 
-        if (isTerminal(targetWin) && itemType == "text") {
-            if (isXWayland) {
-                exec("xdotool key --clearmodifiers ctrl+shift+v");
-            } else {
-                exec("wtype -d 20 -M ctrl -M shift -k v");
-            }
-        } else if (isBrowser(targetWin)) {
+        if (isTerminal(win) && itemType == "text") {
+            exec(xw ? "xdotool key --clearmodifiers ctrl+shift+v"
+                     : "wtype -d 20 -M ctrl -M shift -k v");
+        } else if (isBrowser(win)) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (isXWayland) {
-                exec("xdotool key --clearmodifiers ctrl+v");
-            } else {
-                exec("wtype -d 25 -M ctrl -k v");
-            }
+            exec(xw ? "xdotool key --clearmodifiers ctrl+v"
+                     : "wtype -d 25 -M ctrl -k v");
         } else {
-            if (isXWayland) {
-                exec("xdotool key --clearmodifiers ctrl+v");
-            } else {
-                exec("wtype -d 15 -M ctrl -k v");
-            }
+            exec(xw ? "xdotool key --clearmodifiers ctrl+v"
+                     : "wtype -d 15 -M ctrl -k v");
         }
     }).detach();
 }
 
-// ============================================================================
-// Window Detection (1:1 from AGS)
-// ============================================================================
+// ── Window detection (1:1 from AGS) ─────────────────────────────────────────
 
 ClipboardRenderer::WindowInfo ClipboardRenderer::getActiveWindowInfo() {
     WindowInfo info;
@@ -851,97 +732,69 @@ ClipboardRenderer::WindowInfo ClipboardRenderer::getActiveWindowInfo() {
         if (pos < json.size() && json[pos] == '"') {
             pos++;
             std::string val;
-            while (pos < json.size() && json[pos] != '"') {
-                val += json[pos++];
-            }
+            while (pos < json.size() && json[pos] != '"') val += json[pos++];
             return val;
         }
         std::string val;
-        while (pos < json.size() && json[pos] != ',' && json[pos] != '}') {
-            val += json[pos++];
-        }
+        while (pos < json.size() && json[pos] != ',' && json[pos] != '}') val += json[pos++];
         return val;
     };
 
-    info.windowClass = extract("class");
+    info.windowClass  = extract("class");
     info.initialClass = extract("initialClass");
-    info.title = extract("title");
+    info.title        = extract("title");
     info.initialTitle = extract("initialTitle");
-    info.address = extract("address");
-    info.xwayland = extract("xwayland") == "true";
-
-    std::string pidStr = extract("pid");
-    if (!pidStr.empty()) info.pid = std::atoi(pidStr.c_str());
-
+    info.address      = extract("address");
+    info.xwayland     = extract("xwayland") == "true";
+    std::string pid   = extract("pid");
+    if (!pid.empty()) info.pid = std::atoi(pid.c_str());
     return info;
 }
 
 bool ClipboardRenderer::isKittyTerminal(const WindowInfo& win) {
-    auto lower = [](std::string s) {
-        std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-        return s;
-    };
-    if (lower(win.initialTitle) == "kitty") return true;
+    if (toLower(win.initialTitle) == "kitty") return true;
     if (win.pid > 0) {
-        std::string comm = exec("cat /proc/" + std::to_string(win.pid) + "/comm 2>/dev/null");
-        if (lower(comm) == "kitty") return true;
+        if (toLower(exec("cat /proc/" + std::to_string(win.pid) + "/comm 2>/dev/null")) == "kitty")
+            return true;
     }
     return false;
 }
 
 bool ClipboardRenderer::isTerminal(const WindowInfo& win) {
-    auto lower = [](std::string s) {
-        std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-        return s;
-    };
     std::vector<std::string> fields = {
-        lower(win.windowClass), lower(win.initialClass),
-        lower(win.title), lower(win.initialTitle)
+        toLower(win.windowClass), toLower(win.initialClass),
+        toLower(win.title), toLower(win.initialTitle)
     };
-    for (const auto& field : fields) {
-        if (field.empty()) continue;
-        for (const auto& term : TERMINAL_IDENTIFIERS) {
-            if (field.find(term) != std::string::npos) return true;
-        }
+    for (const auto& f : fields) {
+        if (f.empty()) continue;
+        for (const auto& t : TERMINAL_IDENTIFIERS)
+            if (f.find(t) != std::string::npos) return true;
     }
     if (win.pid > 0) {
-        std::string comm = lower(exec("cat /proc/" + std::to_string(win.pid) + "/comm 2>/dev/null"));
-        for (const auto& term : TERMINAL_IDENTIFIERS) {
-            if (comm.find(term) != std::string::npos) return true;
-        }
+        std::string comm = toLower(exec("cat /proc/" + std::to_string(win.pid) + "/comm 2>/dev/null"));
+        for (const auto& t : TERMINAL_IDENTIFIERS)
+            if (comm.find(t) != std::string::npos) return true;
     }
     return false;
 }
 
 bool ClipboardRenderer::isBrowser(const WindowInfo& win) {
-    auto lower = [](std::string s) {
-        std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-        return s;
-    };
-    std::string cls = lower(win.windowClass);
-    return cls.find("firefox") != std::string::npos ||
-           cls.find("chrome") != std::string::npos ||
-           cls.find("chromium") != std::string::npos ||
-           cls.find("brave") != std::string::npos ||
-           cls.find("edge") != std::string::npos;
+    std::string cls = toLower(win.windowClass);
+    for (const auto& b : BROWSER_IDENTIFIERS)
+        if (cls.find(b) != std::string::npos) return true;
+    return false;
 }
 
-// ============================================================================
-// Positioning (matching AGS repositionWindow)
-// ============================================================================
+// ── Positioning ─────────────────────────────────────────────────────────────
 
 void ClipboardRenderer::repositionWindow() {
     if (!m_window) return;
-
-    int caretX = 400, caretY = 400;
+    int cx = 400, cy = 400;
     std::ifstream f(m_config.caretPosFile);
-    if (f.is_open()) {
-        char comma;
-        f >> caretX >> comma >> caretY;
-    }
+    if (f.is_open()) { char c; f >> cx >> c >> cy; }
 
-    int x = caretX - m_config.windowWidth / 2 + m_config.offsetX;
-    int y = caretY - m_config.windowHeight / 2 + m_config.offsetY;
+    int x = cx - m_config.windowWidth / 2 + m_config.offsetX;
+    int y = cy - m_config.windowHeight / 2 + m_config.offsetY;
     if (x < 0) x = 0;
     if (y < 0) y = 0;
 
@@ -949,9 +802,7 @@ void ClipboardRenderer::repositionWindow() {
     gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_TOP, y);
 }
 
-// ============================================================================
-// Offset Persistence (matching AGS loadCaretOffsetSync / saveCaretOffset)
-// ============================================================================
+// ── Offset persistence ──────────────────────────────────────────────────────
 
 void ClipboardRenderer::loadCaretOffset() {
     if (m_config.userSettingsFile.empty()) return;
@@ -979,24 +830,23 @@ void ClipboardRenderer::saveCaretOffset() {
     std::string content;
     {
         std::ifstream f(m_config.userSettingsFile);
-        if (f.is_open()) {
+        if (f.is_open())
             content.assign((std::istreambuf_iterator<char>(f)),
                             std::istreambuf_iterator<char>());
-        }
     }
     size_t cmPos = content.find("\"clipboard_manager\"");
     if (cmPos != std::string::npos) {
         auto replaceInt = [&](const std::string& key, int value) {
             size_t pos = content.find("\"" + key + "\"", cmPos);
             if (pos == std::string::npos) return;
-            size_t colonPos = content.find(':', pos);
-            if (colonPos == std::string::npos) return;
-            size_t valStart = colonPos + 1;
-            while (valStart < content.size() && content[valStart] == ' ') valStart++;
-            size_t valEnd = valStart;
-            if (valEnd < content.size() && content[valEnd] == '-') valEnd++;
-            while (valEnd < content.size() && content[valEnd] >= '0' && content[valEnd] <= '9') valEnd++;
-            content.replace(valStart, valEnd - valStart, std::to_string(value));
+            size_t col = content.find(':', pos);
+            if (col == std::string::npos) return;
+            size_t vs = col + 1;
+            while (vs < content.size() && content[vs] == ' ') vs++;
+            size_t ve = vs;
+            if (ve < content.size() && content[ve] == '-') ve++;
+            while (ve < content.size() && content[ve] >= '0' && content[ve] <= '9') ve++;
+            content.replace(vs, ve - vs, std::to_string(value));
         };
         replaceInt("caret_offset_x", m_config.offsetX);
         replaceInt("caret_offset_y", m_config.offsetY);
@@ -1007,13 +857,12 @@ void ClipboardRenderer::saveCaretOffset() {
                       "    \"caret_offset_y\": " + std::to_string(m_config.offsetY) + "\n"
                       "  }\n}";
         } else {
-            size_t lastBrace = content.rfind('}');
-            if (lastBrace != std::string::npos) {
-                std::string insert = ",\n  \"clipboard_manager\": {\n"
+            size_t lb = content.rfind('}');
+            if (lb != std::string::npos) {
+                content.insert(lb, ",\n  \"clipboard_manager\": {\n"
                     "    \"caret_offset_x\": " + std::to_string(m_config.offsetX) + ",\n"
                     "    \"caret_offset_y\": " + std::to_string(m_config.offsetY) + "\n"
-                    "  }\n";
-                content.insert(lastBrace, insert);
+                    "  }\n");
             }
         }
     }
@@ -1021,51 +870,31 @@ void ClipboardRenderer::saveCaretOffset() {
     if (f.is_open()) f << content;
 }
 
-// ============================================================================
-// Public API (direct GTK calls - we're on the main thread)
-// ============================================================================
+// ── Public API ──────────────────────────────────────────────────────────────
 
 void ClipboardRenderer::show() {
-    if (m_window && !m_visible) {
-        gtk_window_present(GTK_WINDOW(m_window));
-        m_visible = true;
-    }
+    if (m_window && !m_visible) { gtk_window_present(GTK_WINDOW(m_window)); m_visible = true; }
 }
 
 void ClipboardRenderer::hide() {
-    if (m_window && m_visible) {
-        gtk_widget_set_visible(m_window, FALSE);
-        m_visible = false;
-    }
+    if (m_window && m_visible) { gtk_widget_set_visible(m_window, FALSE); m_visible = false; }
 }
 
 void ClipboardRenderer::toggle() {
     if (!m_window) return;
-    if (m_visible) {
-        gtk_widget_set_visible(m_window, FALSE);
-        m_visible = false;
-    } else {
-        gtk_window_present(GTK_WINDOW(m_window));
-        m_visible = true;
-    }
+    if (m_visible) hide(); else show();
 }
 
-bool ClipboardRenderer::isVisible() const {
-    return m_visible;
-}
+bool ClipboardRenderer::isVisible() const { return m_visible; }
 
 void ClipboardRenderer::setOffset(int x, int y) {
     m_config.offsetX = x;
     m_config.offsetY = y;
     saveCaretOffset();
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%d,%d", m_config.offsetX, m_config.offsetY);
-    if (m_offsetLabel) gtk_label_set_text(GTK_LABEL(m_offsetLabel), buf);
+    updateOffsetOverlay();
     repositionWindow();
 }
 
-void ClipboardRenderer::refresh() {
-    updateList();
-}
+void ClipboardRenderer::refresh() { updateList(); }
 
 } // namespace hyprclipx
