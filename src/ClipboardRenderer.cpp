@@ -47,10 +47,18 @@ static const char* CLIPBOARD_CSS = R"CSS(
 }
 
 /* ── Sidebar ── */
-.cm-sidebar {
+.cm-sidebar-header {
   background: #0e0e0e;
   border-right: 1px solid #1a1a1a;
-  padding: 4px 2px;
+  border-bottom: 1px solid #1a1a1a;
+  padding: 2px;
+  min-width: 36px;
+}
+
+.cm-sidebar-body {
+  background: #0e0e0e;
+  border-right: 1px solid #1a1a1a;
+  padding: 2px;
   min-width: 36px;
 }
 
@@ -130,6 +138,15 @@ static const char* CLIPBOARD_CSS = R"CSS(
   background: rgba(58, 106, 58, 0.25);
 }
 
+.cm-triangle {
+  font-size: 9px;
+  color: #2a3a3a;
+  min-width: 10px;
+}
+.cm-item.selected .cm-triangle {
+  color: #5a9a5a;
+}
+
 .cm-preview {
   font-family: "Fira Code", monospace;
   font-size: 11px;
@@ -139,10 +156,24 @@ static const char* CLIPBOARD_CSS = R"CSS(
   color: #9aaa9a;
 }
 
+.cm-fav-column {
+  border-left: 1px solid #1a1a1a;
+  min-width: 26px;
+  padding: 2px 0;
+}
+
 .cm-fav-indicator {
   font-size: 10px;
   color: #2a3a3a;
-  min-width: 14px;
+  min-width: 26px;
+  padding: 3px 0;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+}
+.cm-fav-indicator:hover {
+  background: transparent;
+  border-color: transparent;
 }
 .cm-fav-indicator.starred {
   color: #f9e2af;
@@ -269,10 +300,11 @@ void ClipboardRenderer::initialize() {
 //
 //  ╭────┬────────────────────────────────────────────────╮
 //  │ 📋 │ 🔍 …                                           │
-//  │ ⊛  ├────────────────────────────────────────────────┤
-//  │ ☆  │ ▸ item text preview...                      ★  │
-//  │ 𝐓  │   another entry...                          ☆  │
-//  │ 🖼  │   ...                                       ☆  │
+//  ├────┼────────────────────────────────────────────────┤
+//  │ ⊛  │ ▸ item text preview...                      ★  │
+//  │ ☆  │   another entry...                          ☆  │
+//  │ 𝐓  │   ...                                       ☆  │
+//  │ 🖼  │                                                │
 //  │    │                                                │
 //  │ 🗑  │                                                │
 //  │ 7  │                                                │
@@ -280,31 +312,50 @@ void ClipboardRenderer::initialize() {
 //   ↑↓ ⏎ ⌫ ⇥ ⎋ ⌘⌥↕
 
 void ClipboardRenderer::buildUI() {
-    // Root: horizontal (sidebar | content)
-    GtkWidget* root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    // Root: vertical (header-row | body-row | hints)
+    // Split into rows so sidebar buttons align exactly with list items
+    GtkWidget* root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_widget_add_css_class(root, "cm-root");
 
-    gtk_box_append(GTK_BOX(root), createSidebar());
+    // Header row: sidebar-header | search bar (same height)
+    GtkWidget* headerRow = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_box_append(GTK_BOX(headerRow), createSidebarHeader());
+    GtkWidget* searchBar = createSearchBar();
+    gtk_widget_set_hexpand(searchBar, TRUE);
+    gtk_box_append(GTK_BOX(headerRow), searchBar);
+    gtk_box_append(GTK_BOX(root), headerRow);
 
-    // Content: vertical (search | items | hints)
-    GtkWidget* content = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_hexpand(content, TRUE);
-
-    gtk_box_append(GTK_BOX(content), createSearchBar());
+    // Body row: sidebar-body | scrolled list (filter buttons align with items)
+    GtkWidget* bodyRow = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    gtk_widget_set_vexpand(bodyRow, TRUE);
+    gtk_box_append(GTK_BOX(bodyRow), createSidebarBody());
 
     m_scrolled = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(m_scrolled),
                                    GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
     gtk_widget_set_vexpand(m_scrolled, TRUE);
+    gtk_widget_set_hexpand(m_scrolled, TRUE);
     gtk_widget_add_css_class(m_scrolled, "cm-scroll");
+
+    // Scroll content: [item-list | fav-column]
+    GtkWidget* scrollContent = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
     m_listBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
     gtk_widget_add_css_class(m_listBox, "cm-list");
-    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(m_scrolled), m_listBox);
-    gtk_box_append(GTK_BOX(content), m_scrolled);
+    gtk_widget_set_hexpand(m_listBox, TRUE);
+    gtk_box_append(GTK_BOX(scrollContent), m_listBox);
 
-    gtk_box_append(GTK_BOX(content), createHintBar());
-    gtk_box_append(GTK_BOX(root), content);
+    m_favBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    gtk_widget_add_css_class(m_favBox, "cm-fav-column");
+    gtk_widget_set_vexpand(m_favBox, TRUE);
+    gtk_box_append(GTK_BOX(scrollContent), m_favBox);
+
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(m_scrolled), scrollContent);
+    gtk_box_append(GTK_BOX(bodyRow), m_scrolled);
+    gtk_box_append(GTK_BOX(root), bodyRow);
+
+    // Hint bar (full width)
+    gtk_box_append(GTK_BOX(root), createHintBar());
 
     // Overlay for offset indicator
     GtkWidget* overlay = gtk_overlay_new();
@@ -325,21 +376,26 @@ void ClipboardRenderer::buildUI() {
     gtk_widget_add_controller(m_window, kc);
 }
 
-// ── Sidebar (icon column) ───────────────────────────────────────────────────
+// ── Sidebar header (logo, shares row with search bar) ───────────────────────
 
-GtkWidget* ClipboardRenderer::createSidebar() {
-    GtkWidget* bar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-    gtk_widget_add_css_class(bar, "cm-sidebar");
+GtkWidget* ClipboardRenderer::createSidebarHeader() {
+    GtkWidget* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_add_css_class(box, "cm-sidebar-header");
 
-    // Clipboard icon (decorative)
-    GtkWidget* logo = gtk_label_new("\xf0\x9f\x93\x8b");
+    GtkWidget* logo = gtk_label_new("\xe2\x96\xa0");
     gtk_widget_add_css_class(logo, "cm-sidebar-icon");
-    gtk_box_append(GTK_BOX(bar), logo);
+    gtk_widget_set_valign(logo, GTK_ALIGN_CENTER);
+    gtk_widget_set_vexpand(logo, TRUE);
+    gtk_box_append(GTK_BOX(box), logo);
 
-    // Separator
-    GtkWidget* sep1 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_widget_add_css_class(sep1, "cm-sidebar-sep");
-    gtk_box_append(GTK_BOX(bar), sep1);
+    return box;
+}
+
+// ── Sidebar body (filter buttons, shares row with list) ─────────────────────
+
+GtkWidget* ClipboardRenderer::createSidebarBody() {
+    GtkWidget* bar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+    gtk_widget_add_css_class(bar, "cm-sidebar-body");
 
     // Filter icons
     struct FilterData { ClipboardRenderer* self; int idx; };
@@ -370,9 +426,9 @@ GtkWidget* ClipboardRenderer::createSidebar() {
     gtk_box_append(GTK_BOX(bar), spacer);
 
     // Separator
-    GtkWidget* sep2 = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
-    gtk_widget_add_css_class(sep2, "cm-sidebar-sep");
-    gtk_box_append(GTK_BOX(bar), sep2);
+    GtkWidget* sep = gtk_separator_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_widget_add_css_class(sep, "cm-sidebar-sep");
+    gtk_box_append(GTK_BOX(bar), sep);
 
     // Clear button
     GtkWidget* clearBtn = gtk_button_new_with_label("\xf0\x9f\x97\x91");
@@ -400,11 +456,11 @@ GtkWidget* ClipboardRenderer::createSearchBar() {
     GtkWidget* box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_widget_add_css_class(box, "cm-search");
 
-    GtkWidget* icon = gtk_label_new("\xf0\x9f\x94\x8d");
+    GtkWidget* icon = gtk_label_new("\xe2\x97\x8e");
     gtk_box_append(GTK_BOX(box), icon);
 
     m_searchEntry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(m_searchEntry), "\xe2\x80\xa6");
+    gtk_entry_set_placeholder_text(GTK_ENTRY(m_searchEntry), "filter search...");
     gtk_widget_set_hexpand(m_searchEntry, TRUE);
     gtk_widget_set_can_focus(m_searchEntry, FALSE);
     gtk_widget_add_css_class(m_searchEntry, "cm-search-input");
@@ -459,18 +515,26 @@ void ClipboardRenderer::updateList() {
     m_items = m_manager.fetchItems(m_filter, m_search, m_config.maxItems);
     if (!m_listBox) return;
     removeAllChildren(m_listBox);
+    if (m_favBox) removeAllChildren(m_favBox);
 
     for (size_t i = 0; i < m_items.size(); i++) {
         const auto& item = m_items[i];
 
-        GtkWidget* row = gtk_button_new();
-        gtk_widget_set_can_focus(row, FALSE);
-        gtk_widget_add_css_class(row, "cm-item");
-        gtk_widget_add_css_class(row, item.type.c_str());
+        // Item button (selection highlight only here)
+        GtkWidget* btn = gtk_button_new();
+        gtk_widget_set_can_focus(btn, FALSE);
+        gtk_widget_add_css_class(btn, "cm-item");
+        gtk_widget_add_css_class(btn, item.type.c_str());
         if (static_cast<int>(i) == m_selectedIndex)
-            gtk_widget_add_css_class(row, "selected");
+            gtk_widget_add_css_class(btn, "selected");
 
         GtkWidget* hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
+
+        // Selection triangle
+        GtkWidget* triangle = gtk_label_new(
+            static_cast<int>(i) == m_selectedIndex ? "\xe2\x96\xb8" : " ");
+        gtk_widget_add_css_class(triangle, "cm-triangle");
+        gtk_box_append(GTK_BOX(hbox), triangle);
 
         // Image indicator
         if (item.type == "image") {
@@ -490,25 +554,26 @@ void ClipboardRenderer::updateList() {
         gtk_widget_add_css_class(preview, "cm-preview");
         gtk_box_append(GTK_BOX(hbox), preview);
 
-        // Fav star (inline indicator, not a button)
-        GtkWidget* star = gtk_label_new(
-            item.favorite ? "\xe2\x98\x85" : "\xe2\x98\x86");
-        gtk_widget_add_css_class(star, "cm-fav-indicator");
-        if (item.favorite) gtk_widget_add_css_class(star, "starred");
-        gtk_box_append(GTK_BOX(hbox), star);
-
-        gtk_button_set_child(GTK_BUTTON(row), hbox);
+        gtk_button_set_child(GTK_BUTTON(btn), hbox);
 
         // Click → paste
         struct ClickData { ClipboardRenderer* self; std::string uuid; std::string type; };
         auto* cd = new ClickData{this, item.uuid, item.type};
-        g_signal_connect(row, "clicked",
+        g_signal_connect(btn, "clicked",
             G_CALLBACK(+[](GtkButton*, gpointer d) {
                 auto* cd = static_cast<ClickData*>(d);
                 cd->self->pasteItem(cd->uuid, cd->type);
             }), cd);
 
-        gtk_box_append(GTK_BOX(m_listBox), row);
+        gtk_box_append(GTK_BOX(m_listBox), btn);
+
+        // Fav star (separate column, same widget type as cm-item = same height)
+        GtkWidget* star = gtk_button_new_with_label(
+            item.favorite ? "\xe2\x98\x85" : "\xe2\x98\x86");
+        gtk_widget_set_can_focus(star, FALSE);
+        gtk_widget_add_css_class(star, "cm-fav-indicator");
+        if (item.favorite) gtk_widget_add_css_class(star, "starred");
+        gtk_box_append(GTK_BOX(m_favBox), star);
     }
 
     // Update count
@@ -522,11 +587,21 @@ void ClipboardRenderer::updateSelection(int newIndex) {
     if (newIndex == m_selectedIndex || !m_listBox) return;
 
     int idx = 0;
-    GtkWidget* child = gtk_widget_get_first_child(m_listBox);
-    while (child) {
-        if (idx == m_selectedIndex) gtk_widget_remove_css_class(child, "selected");
-        if (idx == newIndex)        gtk_widget_add_css_class(child, "selected");
-        child = gtk_widget_get_next_sibling(child);
+    GtkWidget* btn = gtk_widget_get_first_child(m_listBox);
+    while (btn) {
+        if (idx == m_selectedIndex || idx == newIndex) {
+            if (idx == m_selectedIndex) gtk_widget_remove_css_class(btn, "selected");
+            if (idx == newIndex)        gtk_widget_add_css_class(btn, "selected");
+            // Update triangle indicator
+            GtkWidget* hbox = gtk_button_get_child(GTK_BUTTON(btn));
+            if (hbox) {
+                GtkWidget* tri = gtk_widget_get_first_child(hbox);
+                if (tri && GTK_IS_LABEL(tri))
+                    gtk_label_set_text(GTK_LABEL(tri),
+                        idx == newIndex ? "\xe2\x96\xb8" : " ");
+            }
+        }
+        btn = gtk_widget_get_next_sibling(btn);
         idx++;
     }
     m_selectedIndex = newIndex;

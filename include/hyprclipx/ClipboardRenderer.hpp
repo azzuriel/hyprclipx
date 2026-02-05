@@ -33,6 +33,7 @@ private:
     // GTK widgets
     GtkWidget* m_window       = nullptr;
     GtkWidget* m_listBox      = nullptr;
+    GtkWidget* m_favBox       = nullptr;
     GtkWidget* m_searchEntry  = nullptr;
     GtkWidget* m_scrolled     = nullptr;
     GtkWidget* m_offsetLabel  = nullptr;
@@ -50,7 +51,8 @@ private:
 
     // UI assembly
     void buildUI();
-    GtkWidget* createSidebar();
+    GtkWidget* createSidebarHeader();
+    GtkWidget* createSidebarBody();
     GtkWidget* createSearchBar();
     GtkWidget* createHintBar();
 

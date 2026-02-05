@@ -4,7 +4,7 @@
 
 A Hyprland plugin for a **layer-shell clipboard manager** with smart paste, caret positioning and filter tabs.
 
-<!-- Screenshots will be added later -->
+![HyprClipX Screenshot](docs/screenshots/azz-hyprclipx.png)
 
 ## Overview
 
