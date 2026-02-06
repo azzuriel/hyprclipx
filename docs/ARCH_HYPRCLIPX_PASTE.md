@@ -102,15 +102,16 @@ Fallback for all other Wayland-native applications.
 ```
 getActiveWindowInfo() via hyprctl activewindow -j
     │
-    ├─ isKittyTerminal()?  → kitty remote paste (with fallback)
-    ├─ isTerminal()?       → Ctrl+Shift+V via wtype
-    ├─ isBrowser()?        → delay + Ctrl+V via wtype
-    ├─ xwayland == true?   → xdotool key ctrl+shift+v
-    └─ default             → Ctrl+V via wtype
+    ├─ isKittyTerminal()?  → kitty remote paste (with fallback to Ctrl+Shift+V)
+    ├─ isTerminal()?       → Ctrl+Shift+V (wtype or xdotool if xwayland)
+    ├─ isBrowser()?        → delay + Ctrl+V (wtype or xdotool if xwayland)
+    └─ default             → Ctrl+V (wtype or xdotool if xwayland)
 ```
 
 ### Terminal Detection
-Matches window class/title against: `kitty`, `foot`, `alacritty`, `wezterm`, `termite`, `xterm`, `urxvt`, `st-256color`, `konsole`, `gnome-terminal`, `tilix`
+Matches window class/title against: `kitty`, `foot`, `alacritty`, `wezterm`, `konsole`, `gnome-terminal`, `xterm`, `urxvt`, `terminator`, `tilix`, `st`, `rxvt`, `sakura`, `terminology`, `guake`, `tilda`, `hyper`, `tabby`, `contour`, `cool-retro-term`, `claude`
+
+Note: JetBrains IDEs (PyCharm, CLion, etc.) are NOT terminals. They use standard Ctrl+V for paste. Their embedded JediTerm terminal also accepts Ctrl+V because the IDE intercepts it.
 
 ### Browser Detection
 Matches window class against: `firefox`, `chromium`, `google-chrome`, `brave`, `vivaldi`, `opera`, `microsoft-edge`, `zen`, `floorp`, `librewolf`

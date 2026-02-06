@@ -20,11 +20,7 @@ static const std::vector<std::string> TERMINAL_IDENTIFIERS = {
     "kitty", "alacritty", "foot", "wezterm", "konsole",
     "gnome-terminal", "xterm", "urxvt", "terminator", "tilix",
     "st", "rxvt", "sakura", "terminology", "guake", "tilda",
-    "hyper", "tabby", "contour", "cool-retro-term", "claude",
-    "jetbrains-pycharm", "jetbrains-clion", "jetbrains-idea",
-    "jetbrains-webstorm", "jetbrains-phpstorm", "jetbrains-goland",
-    "jetbrains-rider", "jetbrains-rubymine", "jetbrains-datagrip",
-    "jetbrains-studio"
+    "hyper", "tabby", "contour", "cool-retro-term", "claude"
 };
 
 // ── Filter definitions (SSOT) ───────────────────────────────────────────────
