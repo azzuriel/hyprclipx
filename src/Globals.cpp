@@ -9,6 +9,7 @@
 #include <hyprland/src/helpers/Monitor.hpp>
 #include <hyprland/src/desktop/Workspace.hpp>
 #include <hyprland/src/desktop/view/Window.hpp>
+#include <hyprland/src/managers/SeatManager.hpp>
 
 #include <cstdlib>
 #include <cstdio>
@@ -56,28 +57,32 @@ void captureAndSendUI(const std::string& cmd) {
     // Reap zombie children from previous calls
     while (waitpid(-1, nullptr, WNOHANG) > 0) {}
 
-    // Save previous window address BEFORE opening UI (must capture now,
-    // because focus changes once clipboard window opens)
-    std::string windowAddr;
+    // Get the keyboard-focused window via SeatManager (not mouse cursor!)
+    // This correctly identifies the focused window on multi-monitor setups
+    // regardless of where the mouse pointer is
+    PHLWINDOW pFocusedWindow;
     {
-        auto monitor = g_pCompositor->getMonitorFromCursor();
-        if (monitor && monitor->m_activeWorkspace) {
-            auto pWindow = monitor->m_activeWorkspace->getLastFocusedWindow();
-            if (pWindow) {
-                windowAddr = std::format("0x{:x}", (uintptr_t)pWindow.get());
-            }
-        }
+        auto focusSurface = g_pSeatManager->m_state.keyboardFocus.lock();
+        if (focusSurface)
+            pFocusedWindow = g_pCompositor->getWindowFromSurface(focusSurface);
     }
 
-    if (!windowAddr.empty()) {
+    // Save previous window address BEFORE opening UI (must capture now,
+    // because focus changes once clipboard window opens)
+    if (pFocusedWindow) {
+        std::string windowAddr = std::format("0x{:x}", (uintptr_t)pFocusedWindow.get());
         std::ofstream f(g_config.prevWindowFile);
         if (f.is_open()) f << windowAddr;
     }
 
-    // Capture monitor bounds from compositor (only available in parent process)
+    // Capture monitor bounds from the focused window's monitor
     int monX = 0, monY = 0, monW = 1920, monH = 1080;
     {
-        auto monitor = g_pCompositor->getMonitorFromCursor();
+        PHLMONITOR monitor;
+        if (pFocusedWindow)
+            monitor = pFocusedWindow->m_monitor.lock();
+        if (!monitor)
+            monitor = g_pCompositor->getMonitorFromCursor();
         if (monitor) {
             monX = static_cast<int>(monitor->m_position.x);
             monY = static_cast<int>(monitor->m_position.y);
