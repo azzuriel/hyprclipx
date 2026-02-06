@@ -891,6 +891,10 @@ void ClipboardRenderer::repositionWindow() {
         y = std::max(y, monY);
         x = std::min(x, maxX - m_config.windowWidth);
         y = std::min(y, maxY - m_config.windowHeight);
+    } else {
+        // No monitor bounds in file (old plugin or first run) — safe defaults
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
     }
 
     gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_LEFT, x);

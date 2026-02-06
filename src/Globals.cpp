@@ -102,6 +102,26 @@ void captureAndSendUI(const std::string& cmd) {
                 f << cx << "," << cy << "," << monX << "," << monY << "," << monW << "," << monH;
         };
 
+        // Check if a position is within monitor bounds
+        auto isInsideMonitor = [&](int px, int py) -> bool {
+            return px >= monX && px < monX + monW && py >= monY && py < monY + monH;
+        };
+
+        // Get cursor position via hyprctl (always in Hyprland logical coordinates)
+        auto getCursorPos = [](int& outX, int& outY) -> bool {
+            FILE* p = popen("hyprctl cursorpos -j 2>/dev/null", "r");
+            if (!p) return false;
+            char buf[256] = {};
+            std::string result;
+            while (fgets(buf, sizeof(buf), p)) result += buf;
+            pclose(p);
+            size_t xp = result.find("\"x\":");
+            size_t yp = result.find("\"y\":");
+            if (xp != std::string::npos) outX = std::atoi(result.c_str() + xp + 4);
+            if (yp != std::string::npos) outY = std::atoi(result.c_str() + yp + 4);
+            return outX >= 0 && outY >= 0;
+        };
+
         // 1. AT-SPI caret capture (PRIMARY - matching AGS get-caret-position.py)
         bool caretFound = false;
         FILE* pipe = popen(("/usr/bin/python3 " + caretHelper + " 2>/dev/null").c_str(), "r");
@@ -118,28 +138,23 @@ void captureAndSendUI(const std::string& cmd) {
                 if (xp != std::string::npos) cx = std::atoi(result.c_str() + xp + 4);
                 if (yp != std::string::npos) cy = std::atoi(result.c_str() + yp + 4);
                 if (cx >= 0 && cy >= 0) {
-                    writeCaretFile(cx, cy);
-                    caretFound = true;
+                    // Validate AT-SPI position against monitor bounds
+                    // AT-SPI can return coordinates in wrong space (physical pixels
+                    // vs logical) on multi-monitor setups with scaling
+                    if (isInsideMonitor(cx, cy)) {
+                        writeCaretFile(cx, cy);
+                        caretFound = true;
+                    }
+                    // AT-SPI position outside monitor → fall through to cursor
                 }
             }
         }
 
-        // 2. Fallback to mouse position ONLY if AT-SPI failed (matching AGS)
+        // 2. Fallback to cursor position if AT-SPI failed or returned out-of-bounds
         if (!caretFound) {
-            pipe = popen("hyprctl cursorpos -j 2>/dev/null", "r");
-            if (pipe) {
-                char buf[256] = {};
-                std::string result;
-                while (fgets(buf, sizeof(buf), pipe)) result += buf;
-                pclose(pipe);
-                int mx = -1, my = -1;
-                size_t xp = result.find("\"x\":");
-                size_t yp = result.find("\"y\":");
-                if (xp != std::string::npos) mx = std::atoi(result.c_str() + xp + 4);
-                if (yp != std::string::npos) my = std::atoi(result.c_str() + yp + 4);
-                if (mx >= 0 && my >= 0) {
-                    writeCaretFile(mx, my);
-                }
+            int mx = -1, my = -1;
+            if (getCursorPos(mx, my)) {
+                writeCaretFile(mx, my);
             }
         }
 
