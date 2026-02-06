@@ -926,8 +926,9 @@ void ClipboardRenderer::repositionWindow() {
         y = std::min(y, monY + monH - m_config.windowHeight);
     }
 
-    gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_LEFT, x);
-    gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_TOP, y);
+    // Layer-shell margins are relative to the monitor origin, not absolute
+    gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_LEFT, x - monX);
+    gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_TOP, y - monY);
 }
 
 // ── Offset persistence ──────────────────────────────────────────────────────
