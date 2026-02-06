@@ -74,6 +74,18 @@ void captureAndSendUI(const std::string& cmd) {
         if (f.is_open()) f << windowAddr;
     }
 
+    // Capture monitor bounds from compositor (only available in parent process)
+    int monX = 0, monY = 0, monW = 1920, monH = 1080;
+    {
+        auto monitor = g_pCompositor->getMonitorFromCursor();
+        if (monitor) {
+            monX = static_cast<int>(monitor->m_position.x);
+            monY = static_cast<int>(monitor->m_position.y);
+            monW = static_cast<int>(monitor->m_size.x);
+            monH = static_cast<int>(monitor->m_size.y);
+        }
+    }
+
     // Fork child: capture CARET position + exec UI
     // All blocking calls happen in child (never blocks compositor!)
     std::string caretHelper = g_config.caretHelper;
@@ -82,6 +94,13 @@ void captureAndSendUI(const std::string& cmd) {
 
     if (fork() == 0) {
         setsid();  // Detach from compositor process group
+
+        // Format: caretX,caretY,monX,monY,monW,monH
+        auto writeCaretFile = [&](int cx, int cy) {
+            std::ofstream f(caretPosFile);
+            if (f.is_open())
+                f << cx << "," << cy << "," << monX << "," << monY << "," << monW << "," << monH;
+        };
 
         // 1. AT-SPI caret capture (PRIMARY - matching AGS get-caret-position.py)
         bool caretFound = false;
@@ -99,8 +118,7 @@ void captureAndSendUI(const std::string& cmd) {
                 if (xp != std::string::npos) cx = std::atoi(result.c_str() + xp + 4);
                 if (yp != std::string::npos) cy = std::atoi(result.c_str() + yp + 4);
                 if (cx >= 0 && cy >= 0) {
-                    std::ofstream f(caretPosFile);
-                    if (f.is_open()) f << cx << "," << cy;
+                    writeCaretFile(cx, cy);
                     caretFound = true;
                 }
             }
@@ -120,8 +138,7 @@ void captureAndSendUI(const std::string& cmd) {
                 if (xp != std::string::npos) mx = std::atoi(result.c_str() + xp + 4);
                 if (yp != std::string::npos) my = std::atoi(result.c_str() + yp + 4);
                 if (mx >= 0 && my >= 0) {
-                    std::ofstream f(caretPosFile);
-                    if (f.is_open()) f << mx << "," << my;
+                    writeCaretFile(mx, my);
                 }
             }
         }

@@ -864,14 +864,34 @@ bool ClipboardRenderer::isBrowser(const WindowInfo& win) {
 
 void ClipboardRenderer::repositionWindow() {
     if (!m_window) return;
+
+    // Parse caret position file: caretX,caretY[,monX,monY,monW,monH]
+    // Monitor bounds are written by the plugin using g_pCompositor->getMonitorFromCursor()
     int cx = 400, cy = 400;
-    std::ifstream f(m_config.caretPosFile);
-    if (f.is_open()) { char c; f >> cx >> c >> cy; }
+    int monX = 0, monY = 0, monW = 0, monH = 0;
+    {
+        std::ifstream f(m_config.caretPosFile);
+        if (f.is_open()) {
+            char c;
+            f >> cx >> c >> cy;
+            if (f.peek() == ',') {
+                f >> c >> monX >> c >> monY >> c >> monW >> c >> monH;
+            }
+        }
+    }
 
     int x = cx - m_config.windowWidth / 2 + m_config.offsetX;
     int y = cy - m_config.windowHeight / 2 + m_config.offsetY;
-    if (x < 0) x = 0;
-    if (y < 0) y = 0;
+
+    // Clamp to monitor bounds (provided by plugin from Hyprland internal API)
+    if (monW > 0 && monH > 0) {
+        int maxX = monX + monW;
+        int maxY = monY + monH;
+        x = std::max(x, monX);
+        y = std::max(y, monY);
+        x = std::min(x, maxX - m_config.windowWidth);
+        y = std::min(y, maxY - m_config.windowHeight);
+    }
 
     gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_LEFT, x);
     gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_TOP, y);
