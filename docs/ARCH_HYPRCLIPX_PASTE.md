@@ -87,9 +87,9 @@ Browsers use Ctrl+V (not Ctrl+Shift+V). Small delay ensures clipboard is ready.
 
 ### 4. XWayland Apps (xdotool)
 ```
-clipman-daemon (paste UUID) → wl-copy "text" → xdotool key ctrl+shift+v
+clipman-daemon (paste UUID) → wl-copy "text" → xdotool key ctrl+v
 ```
-X11 apps under XWayland need xdotool for keyboard simulation instead of wtype.
+X11 apps under XWayland (JetBrains, Sublime, etc.) need xdotool for keyboard simulation instead of wtype. Uses Ctrl+V (standard paste), not Ctrl+Shift+V.
 
 ### 5. Default (wtype Ctrl+V)
 ```

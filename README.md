@@ -93,9 +93,10 @@ hyprpm reload
 | Package | Arch Linux | Description |
 |---------|------------|-------------|
 | wl-clipboard | `wl-clipboard` | Wayland clipboard access (`wl-copy`) |
-| wtype | `wtype` | Wayland keyboard simulation |
-| xdotool | `xdotool` | X11 keyboard simulation (for XWayland apps) |
-| Python 3 | `python` | AT-SPI caret position helper |
+| wtype | `wtype` | Wayland keyboard simulation (paste in native apps) |
+| xdotool | `xdotool` | X11 keyboard simulation (paste in XWayland apps) |
+| AT-SPI | `at-spi2-core` | Accessibility API for caret position detection |
+| Python 3 | `python` | AT-SPI caret position helper script |
 
 #### Arch Linux
 
@@ -104,7 +105,7 @@ hyprpm reload
 sudo pacman -S hyprland cmake gcc pkgconf gtk4 gtk4-layer-shell pango cairo
 
 # Runtime dependencies
-sudo pacman -S wl-clipboard wtype xdotool python
+sudo pacman -S wl-clipboard wtype xdotool at-spi2-core python
 ```
 
 #### Build
