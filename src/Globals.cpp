@@ -102,11 +102,6 @@ void captureAndSendUI(const std::string& cmd) {
                 f << cx << "," << cy << "," << monX << "," << monY << "," << monW << "," << monH;
         };
 
-        // Check if a position is within monitor bounds
-        auto isInsideMonitor = [&](int px, int py) -> bool {
-            return px >= monX && px < monX + monW && py >= monY && py < monY + monH;
-        };
-
         // Get cursor position via hyprctl (always in Hyprland logical coordinates)
         auto getCursorPos = [](int& outX, int& outY) -> bool {
             FILE* p = popen("hyprctl cursorpos -j 2>/dev/null", "r");
@@ -138,14 +133,15 @@ void captureAndSendUI(const std::string& cmd) {
                 if (xp != std::string::npos) cx = std::atoi(result.c_str() + xp + 4);
                 if (yp != std::string::npos) cy = std::atoi(result.c_str() + yp + 4);
                 if (cx >= 0 && cy >= 0) {
-                    // Validate AT-SPI position against monitor bounds
-                    // AT-SPI can return coordinates in wrong space (physical pixels
-                    // vs logical) on multi-monitor setups with scaling
-                    if (isInsideMonitor(cx, cy)) {
-                        writeCaretFile(cx, cy);
-                        caretFound = true;
-                    }
-                    // AT-SPI position outside monitor → fall through to cursor
+                    // Clamp AT-SPI position to monitor bounds
+                    // AT-SPI can return coordinates slightly outside (physical
+                    // vs logical pixels on multi-monitor setups with scaling)
+                    cx = std::max(cx, monX);
+                    cx = std::min(cx, monX + monW - 1);
+                    cy = std::max(cy, monY);
+                    cy = std::min(cy, monY + monH - 1);
+                    writeCaretFile(cx, cy);
+                    caretFound = true;
                 }
             }
         }

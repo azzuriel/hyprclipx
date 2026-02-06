@@ -866,7 +866,6 @@ void ClipboardRenderer::repositionWindow() {
     if (!m_window) return;
 
     // Parse caret position file: caretX,caretY[,monX,monY,monW,monH]
-    // Monitor bounds are written by the plugin using g_pCompositor->getMonitorFromCursor()
     int cx = 400, cy = 400;
     int monX = 0, monY = 0, monW = 0, monH = 0;
     {
@@ -880,21 +879,51 @@ void ClipboardRenderer::repositionWindow() {
         }
     }
 
+    // If no monitor bounds from plugin, get them from GTK display
+    if (monW <= 0 || monH <= 0) {
+        GdkDisplay* display = gdk_display_get_default();
+        if (display) {
+            GListModel* monitors = gdk_display_get_monitors(display);
+            guint n = g_list_model_get_n_items(monitors);
+            for (guint i = 0; i < n; i++) {
+                auto* mon = GDK_MONITOR(g_list_model_get_item(monitors, i));
+                GdkRectangle geo;
+                gdk_monitor_get_geometry(mon, &geo);
+                // Find the monitor that contains (or is nearest to) the caret
+                if (cx >= geo.x && cx < geo.x + geo.width &&
+                    cy >= geo.y && cy < geo.y + geo.height) {
+                    monX = geo.x; monY = geo.y;
+                    monW = geo.width; monH = geo.height;
+                    g_object_unref(mon);
+                    break;
+                }
+                // Track the first monitor as fallback
+                if (i == 0) {
+                    monX = geo.x; monY = geo.y;
+                    monW = geo.width; monH = geo.height;
+                }
+                g_object_unref(mon);
+            }
+        }
+    }
+
+    // Clamp caret to monitor bounds before applying offset
+    if (monW > 0 && monH > 0) {
+        cx = std::max(cx, monX);
+        cx = std::min(cx, monX + monW - 1);
+        cy = std::max(cy, monY);
+        cy = std::min(cy, monY + monH - 1);
+    }
+
     int x = cx - m_config.windowWidth / 2 + m_config.offsetX;
     int y = cy - m_config.windowHeight / 2 + m_config.offsetY;
 
-    // Clamp to monitor bounds (provided by plugin from Hyprland internal API)
+    // Clamp final window position to monitor bounds
     if (monW > 0 && monH > 0) {
-        int maxX = monX + monW;
-        int maxY = monY + monH;
         x = std::max(x, monX);
         y = std::max(y, monY);
-        x = std::min(x, maxX - m_config.windowWidth);
-        y = std::min(y, maxY - m_config.windowHeight);
-    } else {
-        // No monitor bounds in file (old plugin or first run) — safe defaults
-        if (x < 0) x = 0;
-        if (y < 0) y = 0;
+        x = std::min(x, monX + monW - m_config.windowWidth);
+        y = std::min(y, monY + monH - m_config.windowHeight);
     }
 
     gtk_layer_set_margin(GTK_WINDOW(m_window), GTK_LAYER_SHELL_EDGE_LEFT, x);
