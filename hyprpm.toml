@@ -9,5 +9,6 @@ output = "build/hyprclipx.so"
 build = [
     "cmake -DCMAKE_BUILD_TYPE=Release -B build",
     "cmake --build build",
-    "mkdir -p $HOME/.local/bin && cp build/hyprclipx-ui $HOME/.local/bin/"
+    "mkdir -p $HOME/.local/bin && cp build/hyprclipx-ui $HOME/.local/bin/",
+    "mkdir -p $HOME/.config/iconmanager/helpers && cp helpers/clipman-daemon.py $HOME/.config/iconmanager/helpers/"
 ]

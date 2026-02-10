@@ -21,6 +21,8 @@ case "$1" in
     install)
         $0 release
         sudo cp build/hyprclipx.so /usr/lib/hyprland/plugins/
+        mkdir -p "$HOME/.local/bin" && cp build/hyprclipx-ui "$HOME/.local/bin/"
+        mkdir -p "$HOME/.config/iconmanager/helpers" && cp helpers/clipman-daemon.py "$HOME/.config/iconmanager/helpers/"
         echo "Installed to /usr/lib/hyprland/plugins/"
         ;;
     *)
