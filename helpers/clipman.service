@@ -1,0 +1,20 @@
+[Unit]
+Description=Clipman - Clipboard Manager Daemon for HyprClipX
+Documentation=https://github.com/azzuriel/hyprclipx
+After=graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/bin/clipman-daemon.py
+Restart=on-failure
+RestartSec=3
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-1
+
+# Security hardening
+NoNewPrivileges=true
+# Note: PrivateTmp=false required because socket is in /tmp
+
+[Install]
+WantedBy=default.target

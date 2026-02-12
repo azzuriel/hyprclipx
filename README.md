@@ -253,7 +253,7 @@ hyprclipx/
 ### Window appears at wrong position
 
 1. AT-SPI may not be running - install `at-spi2-core`
-2. Check caret helper: `python3 ~/.config/iconmanager/helpers/get-caret-position.py`
+2. Check caret helper: `python3 ~/.local/bin/get-caret-position.py`
 3. Use Left/Right arrow keys inside the clipboard window to adjust offset
 
 ### Plugin freezes compositor
@@ -271,7 +271,7 @@ BSD 3-Clause License (same as Hyprland)
 
 - 1:1 port of the [AGS clipboard manager](https://github.com/Aylur/ags)
 - Built for [Hyprland](https://hyprland.org)
-- Smart paste architecture inspired by the original iconmanager templates
+- Smart paste architecture
 
 ## Contributors
 

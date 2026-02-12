@@ -131,9 +131,9 @@ int main(int argc, char* argv[]) {
     Config config = loadConfig();
     const char* homeEnv = getenv("HOME");
     std::string home = homeEnv ? homeEnv : "/root";
-    config.clipmanClient = home + "/.config/iconmanager/helpers/clipman-client.py";
-    config.caretHelper = home + "/.config/iconmanager/helpers/get-caret-position.py";
-    config.userSettingsFile = home + "/.config/iconmanager/user-settings.json";
+    config.clipmanClient = home + "/.local/bin/clipman-client.py";
+    config.caretHelper = home + "/.local/bin/get-caret-position.py";
+    config.userSettingsFile = home + "/.config/hyprclipx/settings.json";
 
     // Create components
     ClipboardManager manager(config);

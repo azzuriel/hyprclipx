@@ -30,9 +30,9 @@ void initGlobals() {
 
     const char* homeEnv = std::getenv("HOME");
     std::string home = homeEnv ? homeEnv : "/root";
-    g_config.clipmanClient = home + "/.config/iconmanager/helpers/clipman-client.py";
-    g_config.caretHelper = home + "/.config/iconmanager/helpers/get-caret-position.py";
-    g_config.userSettingsFile = home + "/.config/iconmanager/user-settings.json";
+    g_config.clipmanClient = home + "/.local/bin/clipman-client.py";
+    g_config.caretHelper = home + "/.local/bin/get-caret-position.py";
+    g_config.userSettingsFile = home + "/.config/hyprclipx/settings.json";
 
     g_ipcHandler = std::make_unique<IPCHandler>();
 }

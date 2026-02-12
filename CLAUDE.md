@@ -138,6 +138,4 @@ Layer-shell clipboard manager for Hyprland. 1:1 port of the AGS clipboard manage
 
 ### Reference
 
-- Original AGS template: `~/.config/iconmanager/templates/ags-clipboard-manager.template`
-- Original toggle script: `~/.config/iconmanager/templates/ags-toggle-clipboard.template`
 - Correct plugin patterns: `/mnt/code/SRC/GITHUB/hyprzones/`
