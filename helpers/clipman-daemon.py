@@ -273,32 +273,41 @@ class ClipboardWatcher:
         if self.text_proc:
             self.text_proc.terminate()
 
+    @staticmethod
+    def _run_with_timeout(cmd, timeout=2):
+        """Run subprocess with proper cleanup on timeout (no zombie cat processes)"""
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        try:
+            stdout, _ = proc.communicate(timeout=timeout)
+            return proc.returncode, stdout
+        except subprocess.TimeoutExpired:
+            os.killpg(proc.pid, signal.SIGKILL)
+            proc.communicate()
+            return None, None
+
     def _watch_text(self):
         """Poll for text clipboard changes"""
         while self.running:
             try:
-                result = subprocess.run(
-                    ["wl-paste", "--no-newline"],
-                    capture_output=True,
-                    timeout=2
-                )
+                rc, stdout = self._run_with_timeout(["wl-paste", "--no-newline"])
 
-                if result.returncode == 0 and result.stdout:
-                    content = result.stdout
-                    content_hash = hashlib.sha256(content).hexdigest()
+                if rc == 0 and stdout:
+                    content_hash = hashlib.sha256(stdout).hexdigest()
 
                     if content_hash != self.last_text_hash:
                         try:
-                            text = content.decode('utf-8')
+                            text = stdout.decode('utf-8')
                             if text.strip():
                                 self.last_text_hash = content_hash
                                 self.on_text(text)
                         except UnicodeDecodeError:
-                            # Not valid UTF-8 text, skip
                             pass
 
-            except subprocess.TimeoutExpired:
-                pass
             except Exception as e:
                 print(f"Text watcher error: {e}", file=sys.stderr)
 
@@ -308,21 +317,15 @@ class ClipboardWatcher:
         """Poll for image clipboard changes"""
         while self.running:
             try:
-                result = subprocess.run(
-                    ["wl-paste", "--type", "image/png"],
-                    capture_output=True,
-                    timeout=2
-                )
+                rc, stdout = self._run_with_timeout(["wl-paste", "--type", "image/png"])
 
-                if result.returncode == 0 and result.stdout:
-                    content_hash = hashlib.sha256(result.stdout).hexdigest()
+                if rc == 0 and stdout:
+                    content_hash = hashlib.sha256(stdout).hexdigest()
 
                     if content_hash != self.last_image_hash:
                         self.last_image_hash = content_hash
-                        self.on_image(result.stdout)
+                        self.on_image(stdout)
 
-            except subprocess.TimeoutExpired:
-                pass
             except Exception as e:
                 print(f"Image watcher error: {e}", file=sys.stderr)
 
