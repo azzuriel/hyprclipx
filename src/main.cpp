@@ -5,6 +5,9 @@
 #define WLR_USE_UNSTABLE
 #include <hyprland/src/plugins/PluginAPI.hpp>
 #include <hyprland/src/Compositor.hpp>
+#include <hyprland/src/config/ConfigManager.hpp>
+
+#include <lua.h>
 
 #include "hyprclipx/Globals.hpp"
 #include "hyprclipx/IPCHandler.hpp"
@@ -54,6 +57,26 @@ static SDispatchResult dispatchToggle(std::string) {
 }
 
 // ============================================================================
+// Lua functions (hl.plugin.hyprclipx.<fn>) - Lua config mode
+// ============================================================================
+
+static int luaShow(lua_State*) {
+    captureAndSendUI("show");
+    return 0;
+}
+
+static int luaHide(lua_State*) {
+    sendUICommand("hide");
+    return 0;
+}
+
+// Toggle: capture caret BEFORE toggle (matching AGS flow)
+static int luaToggle(lua_State*) {
+    captureAndSendUI("toggle");
+    return 0;
+}
+
+// ============================================================================
 // Plugin Lifecycle
 // ============================================================================
 
@@ -71,16 +94,16 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::registerHyprCtlCommand(g_handle,
         SHyprCtlCommand{"hyprclipx", true, cmdHyprclipx});
 
-    // Register dispatchers
-    HyprlandAPI::addDispatcherV2(handle, "hyprclipx:show", dispatchShow);
-    HyprlandAPI::addDispatcherV2(handle, "hyprclipx:hide", dispatchHide);
-    HyprlandAPI::addDispatcherV2(handle, "hyprclipx:toggle", dispatchToggle);
-
-    // Register config values
-    HyprlandAPI::addConfigValue(handle, "plugin:hyprclipx:enabled",
-                                Hyprlang::INT{1});
-    HyprlandAPI::addConfigValue(handle, "plugin:hyprclipx:hotkey",
-                                Hyprlang::STRING{"SUPER V"});
+    // Register dispatchers (hyprland.conf) or Lua functions (hyprland.lua)
+    if (Config::mgr()->type() == Config::CONFIG_LEGACY) {
+        HyprlandAPI::addDispatcherV2(handle, "hyprclipx:show", dispatchShow);
+        HyprlandAPI::addDispatcherV2(handle, "hyprclipx:hide", dispatchHide);
+        HyprlandAPI::addDispatcherV2(handle, "hyprclipx:toggle", dispatchToggle);
+    } else {
+        HyprlandAPI::addLuaFunction(handle, "hyprclipx", "show", luaShow);
+        HyprlandAPI::addLuaFunction(handle, "hyprclipx", "hide", luaHide);
+        HyprlandAPI::addLuaFunction(handle, "hyprclipx", "toggle", luaToggle);
+    }
 
     HyprlandAPI::addNotification(handle,
         "[HyprClipX] Loaded successfully!",

@@ -131,24 +131,26 @@ Add to `~/.config/hypr/hyprland.conf`:
 plugin = /usr/lib/hyprland/plugins/hyprclipx.so
 ```
 
-## Configuration
-
-Add to `~/.config/hypr/hyprland.conf`:
-
-```ini
-# Plugin settings
-plugin:hyprclipx:enabled = 1
-plugin:hyprclipx:hotkey = SUPER V
-
-# Keybinding
-bind = $mainMod, V, hyprclipx:toggle
-```
-
 ## Usage
 
 ### Keybindings
 
-Add to `~/.config/hypr/hyprland.conf`:
+The plugin registers dispatchers for `hyprland.conf` and Lua functions
+(`hl.plugin.hyprclipx.<fn>`) for `hyprland.lua`. Which set is registered
+depends on the config format Hyprland was started with.
+
+`~/.config/hypr/hyprland.lua`:
+
+```lua
+-- Toggle clipboard manager
+hl.bind("SUPER + V", function() hl.plugin.hyprclipx.toggle() end)
+
+-- Show / Hide
+hl.bind("SUPER + SHIFT + V", function() hl.plugin.hyprclipx.show() end)
+hl.bind("Escape", function() hl.plugin.hyprclipx.hide() end)
+```
+
+`~/.config/hypr/hyprland.conf`:
 
 ```ini
 # Toggle clipboard manager
@@ -162,17 +164,20 @@ bind = , Escape, hyprclipx:hide
 ### IPC Commands
 
 ```bash
-# Toggle clipboard window
-hyprctl dispatch hyprclipx:toggle
-
-# Show / Hide
-hyprctl dispatch hyprclipx:show
-hyprctl dispatch hyprclipx:hide
-
-# Via hyprctl command interface
+# Via hyprctl command interface (any config format)
 hyprctl hyprclipx toggle
 hyprctl hyprclipx show
 hyprctl hyprclipx hide
+
+# Via Lua function (hyprland.lua)
+hyprctl eval 'hl.plugin.hyprclipx.toggle()'
+hyprctl eval 'hl.plugin.hyprclipx.show()'
+hyprctl eval 'hl.plugin.hyprclipx.hide()'
+
+# Via dispatcher (hyprland.conf)
+hyprctl dispatch hyprclipx:toggle
+hyprctl dispatch hyprclipx:show
+hyprctl dispatch hyprclipx:hide
 hyprctl hyprclipx reload
 ```
 
@@ -238,7 +243,7 @@ hyprclipx/
 1. Check if plugin is loaded: `hyprctl plugins list`
 2. Check if UI binary is in PATH: `which hyprclipx-ui`
 3. Check if clipman-daemon is running: `ls /tmp/clipman.sock`
-4. Try manual toggle: `hyprctl dispatch hyprclipx:toggle`
+4. Try manual toggle: `hyprctl hyprclipx toggle`
 
 ### Paste not working
 
