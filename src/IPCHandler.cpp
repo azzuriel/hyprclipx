@@ -4,6 +4,9 @@
 #include "hyprclipx/IPCHandler.hpp"
 #include "hyprclipx/Globals.hpp"
 
+#include <hyprland/src/desktop/state/ViewState.hpp>
+#include <hyprland/src/config/shared/actions/ConfigActions.hpp>
+
 namespace hyprclipx {
 
 IPCHandler::IPCHandler() {
@@ -11,6 +14,7 @@ IPCHandler::IPCHandler() {
     registerCommand("hide", cmdHide);
     registerCommand("toggle", cmdToggle);
     registerCommand("reload", cmdReload);
+    registerCommand("focus", cmdFocus);
 }
 
 IPCHandler::~IPCHandler() = default;
@@ -47,6 +51,19 @@ std::string IPCHandler::cmdToggle(const std::string&) {
 std::string IPCHandler::cmdReload(const std::string&) {
     reloadConfig();
     return "config reloaded";
+}
+
+// Focus a window by Hyprland selector (e.g. "address:0x..."). Runs in the
+// compositor, so the UI needs no dispatcher syntax of either config format.
+std::string IPCHandler::cmdFocus(const std::string& args) {
+    const auto window = Desktop::viewState()->query().selector(args).runWindow();
+    if (!window)
+        return "error: no window matches " + args;
+
+    const auto result = ::Config::Actions::focus(window);
+    if (!result)
+        return "error: " + result.error().message;
+    return "ok";
 }
 
 } // namespace hyprclipx

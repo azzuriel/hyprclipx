@@ -760,7 +760,7 @@ void ClipboardRenderer::pasteItem(const std::string& uuid, const std::string& it
 
     std::thread([this, uuid, itemType, prevAddr, mgr]() {
         if (!prevAddr.empty())
-            exec("hyprctl dispatch focuswindow address:" + prevAddr);
+            exec("hyprctl hyprclipx focus address:" + prevAddr);
 
         std::this_thread::sleep_for(std::chrono::milliseconds(150));
         WindowInfo win = getActiveWindowInfo();

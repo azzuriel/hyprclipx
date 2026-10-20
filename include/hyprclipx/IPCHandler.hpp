@@ -21,6 +21,7 @@ public:
     static std::string cmdHide(const std::string& args);
     static std::string cmdToggle(const std::string& args);
     static std::string cmdReload(const std::string& args);
+    static std::string cmdFocus(const std::string& args);
 
 private:
     std::unordered_map<std::string, std::function<std::string(const std::string&)>> m_commands;

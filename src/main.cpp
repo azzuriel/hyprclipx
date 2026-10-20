@@ -21,7 +21,9 @@ inline HANDLE g_pHandle = nullptr;
 // ============================================================================
 
 static std::string cmdHyprclipx(eHyprCtlOutputFormat, std::string request) {
-    std::string cmd = request;
+    // hyprctl passes the whole request ("hyprclipx <cmd> [args]")
+    const size_t namePos = request.find(' ');
+    std::string cmd = namePos == std::string::npos ? "" : request.substr(namePos + 1);
     std::string args;
 
     size_t spacePos = cmd.find(' ');
@@ -92,7 +94,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     // Register IPC command
     HyprlandAPI::registerHyprCtlCommand(g_handle,
-        SHyprCtlCommand{"hyprclipx", true, cmdHyprclipx});
+        SHyprCtlCommand{"hyprclipx", false, cmdHyprclipx});
 
     // Register dispatchers (hyprland.conf) or Lua functions (hyprland.lua)
     if (Config::mgr()->type() == Config::CONFIG_LEGACY) {

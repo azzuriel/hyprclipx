@@ -168,6 +168,7 @@ bind = , Escape, hyprclipx:hide
 hyprctl hyprclipx toggle
 hyprctl hyprclipx show
 hyprctl hyprclipx hide
+hyprctl hyprclipx focus address:0x...   # focus a window by Hyprland selector
 
 # Via Lua function (hyprland.lua)
 hyprctl eval 'hl.plugin.hyprclipx.toggle()'
